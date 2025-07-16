@@ -19,6 +19,7 @@ import {
 } from "@/lib/modrinth-api"
 import ResourceCard from "./resource-card"
 import LoadingSpinner from "@/components/ui/loading-spinner"
+import { EnhancedButton } from "@/components/ui/enhanced-button"
 
 export default function ResourceCenter() {
   const [projects, setProjects] = useState<ModrinthProject[]>([])
@@ -185,33 +186,33 @@ export default function ResourceCenter() {
       )}
 
       {/* Search and Filters */}
-      <Card className="border-0 shadow-lg">
-        <CardContent className="p-6">
-          <div className="space-y-4">
+      <Card className="border-0 shadow-soft hover:shadow-medium transition-all duration-300">
+        <CardContent className="p-8">
+          <div className="space-y-6">
             {/* Search Bar */}
-            <form onSubmit={handleSearchSubmit} className="flex gap-3">
+            <form onSubmit={handleSearchSubmit} className="flex gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
                 <Input
                   placeholder="搜索模组、整合包、资源包..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-12 h-12 text-base border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
                 />
               </div>
-              <Button type="submit" disabled={searchLoading}>
-                {searchLoading ? <LoadingSpinner size="sm" /> : <Search className="h-4 w-4" />}
-              </Button>
+              <EnhancedButton type="submit" disabled={searchLoading} size="lg" className="px-8">
+                {searchLoading ? <LoadingSpinner size="sm" /> : <Search className="h-5 w-5" />}
+              </EnhancedButton>
             </form>
 
             {/* Filters */}
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div className="flex flex-col sm:flex-row gap-3 flex-1">
+              <div className="flex flex-col sm:flex-row gap-4 flex-1">
                 <Select
                   value={selectedProjectType}
                   onValueChange={(value) => setSelectedProjectType(value as ProjectType)}
                 >
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full sm:w-40 h-11 border-2 hover:border-primary/50 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -224,7 +225,7 @@ export default function ResourceCenter() {
                 </Select>
 
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full sm:w-40 h-11 border-2 hover:border-primary/50 transition-colors">
                     <Filter className="mr-2 h-4 w-4" />
                     <SelectValue />
                   </SelectTrigger>
@@ -239,7 +240,7 @@ export default function ResourceCenter() {
                 </Select>
 
                 <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-                  <SelectTrigger className="w-full sm:w-32">
+                  <SelectTrigger className="w-full sm:w-32 h-11 border-2 hover:border-primary/50 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -253,7 +254,7 @@ export default function ResourceCenter() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortIndex)}>
-                  <SelectTrigger className="w-full sm:w-32">
+                  <SelectTrigger className="w-full sm:w-32 h-11 border-2 hover:border-primary/50 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -281,21 +282,23 @@ export default function ResourceCenter() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
+              <div className="flex items-center gap-3 bg-gray-50 p-1 rounded-lg">
+                <EnhancedButton
+                  variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("grid")}
+                  className="transition-all duration-200"
                 >
                   <Grid3X3 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "outline"}
+                </EnhancedButton>
+                <EnhancedButton
+                  variant={viewMode === "list" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("list")}
+                  className="transition-all duration-200"
                 >
                   <List className="h-4 w-4" />
-                </Button>
+                </EnhancedButton>
               </div>
             </div>
           </div>

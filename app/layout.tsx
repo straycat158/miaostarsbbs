@@ -25,9 +25,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className={`${inter.className} ${notoSansSC.variable} font-sans antialiased`}>
-        <EnhancedHeader />
-        <main className="container mx-auto px-4 py-8 max-w-7xl">{children}</main>
+      <body
+        className={`${inter.className} ${notoSansSC.variable} font-sans antialiased min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30`}
+      >
+        <div className="flex flex-col min-h-screen">
+          <EnhancedHeader />
+          <main className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+            <div className="space-y-8">{children}</div>
+          </main>
+          <footer className="border-t bg-gray-50/80 backdrop-blur-sm">
+            <div className="container mx-auto px-4 py-6">
+              <div className="text-center text-sm text-gray-600">
+                <p>&copy; 2024 论坛社区. 保留所有权利.</p>
+              </div>
+            </div>
+          </footer>
+        </div>
         <Toaster />
       </body>
     </html>

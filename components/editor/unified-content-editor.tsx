@@ -127,6 +127,52 @@ export default function UnifiedContentEditor({
   }
 
   const handleFormatting = (type: keyof ContentData["formatting"]) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = content.content.substring(start, end)
+    const beforeText = content.content.substring(0, start)
+    const afterText = content.content.substring(end)
+
+    let formattedText = selectedText
+    let newCursorPos = end
+
+    switch (type) {
+      case "bold":
+        if (selectedText) {
+          formattedText = `**${selectedText}**`
+          newCursorPos = start + formattedText.length
+        } else {
+          formattedText = "**粗体文本**"
+          newCursorPos = start + 2 // Position cursor between asterisks
+        }
+        break
+      case "italic":
+        if (selectedText) {
+          formattedText = `*${selectedText}*`
+          newCursorPos = start + formattedText.length
+        } else {
+          formattedText = "*斜体文本*"
+          newCursorPos = start + 1
+        }
+        break
+      case "underline":
+        if (selectedText) {
+          formattedText = `<u>${selectedText}</u>`
+          newCursorPos = start + formattedText.length
+        } else {
+          formattedText = "<u>下划线文本</u>"
+          newCursorPos = start + 3
+        }
+        break
+    }
+
+    const newContent = beforeText + formattedText + afterText
+    setContent((prev) => ({ ...prev, content: newContent }))
+
+    // Update formatting state
     setContent((prev) => ({
       ...prev,
       formatting: {
@@ -134,6 +180,12 @@ export default function UnifiedContentEditor({
         [type]: !prev.formatting[type],
       },
     }))
+
+    // Restore cursor position
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+    }, 0)
   }
 
   const insertAtCursor = (text: string) => {
@@ -149,7 +201,8 @@ export default function UnifiedContentEditor({
 
     setTimeout(() => {
       textarea.focus()
-      textarea.setSelectionRange(start + text.length, start + text.length)
+      const newPosition = start + text.length
+      textarea.setSelectionRange(newPosition, newPosition)
     }, 0)
   }
 
@@ -400,6 +453,7 @@ export default function UnifiedContentEditor({
                       variant={content.formatting.bold ? "default" : "ghost"}
                       size="sm"
                       onClick={() => handleFormatting("bold")}
+                      className="transition-all duration-200 hover:scale-105"
                     >
                       <Bold className="h-4 w-4" />
                     </Button>
@@ -408,6 +462,7 @@ export default function UnifiedContentEditor({
                       variant={content.formatting.italic ? "default" : "ghost"}
                       size="sm"
                       onClick={() => handleFormatting("italic")}
+                      className="transition-all duration-200 hover:scale-105"
                     >
                       <Italic className="h-4 w-4" />
                     </Button>
@@ -416,6 +471,7 @@ export default function UnifiedContentEditor({
                       variant={content.formatting.underline ? "default" : "ghost"}
                       size="sm"
                       onClick={() => handleFormatting("underline")}
+                      className="transition-all duration-200 hover:scale-105"
                     >
                       <Underline className="h-4 w-4" />
                     </Button>
