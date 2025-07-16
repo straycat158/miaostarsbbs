@@ -75,27 +75,42 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
   const fetchThreads = async () => {
     try {
       console.log("Fetching threads for forum:", forumSlug)
-      const { data: forum } = await supabase.from("forums").select("id").eq("slug", forumSlug).single()
+      // Use maybeSingle to handle cases where the forum might not be found
+      const { data: forum, error: forumError } = await supabase
+        .from("forums")
+        .select("id")
+        .eq("slug", forumSlug)
+        .maybeSingle()
 
-      if (forum) {
-        const { data: threads, error } = await supabase
-          .from("threads")
-          .select(`
+      if (forumError) {
+        console.error("Error fetching forum in EnhancedThreadList:", forumError)
+        setThreads([]) // Ensure threads are empty on forum fetch error
+        return
+      }
+
+      if (!forum) {
+        console.warn(`Forum with slug "${forumSlug}" not found.`)
+        setThreads([]) // Ensure threads are empty if forum is not found
+        return
+      }
+
+      const { data: threads, error } = await supabase
+        .from("threads")
+        .select(`
             *,
             profiles(username, avatar_url, full_name),
             posts(count)
           `)
-          .eq("forum_id", forum.id)
-          .order("is_pinned", { ascending: false })
-          .order("created_at", { ascending: false })
+        .eq("forum_id", forum.id)
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false })
 
-        console.log("Threads query result:", { threads, error })
+      console.log("Threads query result:", { threads, error })
 
-        if (error) {
-          console.error("Error fetching threads:", error)
-        } else {
-          setThreads(threads || [])
-        }
+      if (error) {
+        console.error("Error fetching threads:", error)
+      } else {
+        setThreads(threads || [])
       }
     } catch (error) {
       console.error("Unexpected error fetching threads:", error)

@@ -36,7 +36,7 @@ export default function RootLayout({
           <footer className="border-t bg-gray-50/80 backdrop-blur-sm">
             <div className="container mx-auto px-4 py-6">
               <div className="text-center text-sm text-gray-600">
-                <p>&copy; 2024 艾莫科技工作室. 保留所有权利.</p>
+                <p>&copy; 2024 论坛社区. 保留所有权利.</p>
               </div>
             </div>
           </footer>

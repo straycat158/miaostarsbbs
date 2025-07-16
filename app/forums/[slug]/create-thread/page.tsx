@@ -14,12 +14,17 @@ export default function CreateThreadPage() {
 
   useEffect(() => {
     const fetchForum = async () => {
-      const { data, error } = await supabase.from("forums").select("*").eq("slug", params.slug).single()
+      // Decode and normalize the slug
+      const rawSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
+      const slug = decodeURIComponent(rawSlug).toLowerCase()
 
-      if (error) {
+      const { data, error } = await supabase.from("forums").select("*").eq("slug", slug).maybeSingle()
+
+      if (error || !data) {
+        console.error("Error fetching forum for thread creation:", error)
         toast({
           title: "错误",
-          description: "版块不存在",
+          description: "版块不存在或无法加载",
           variant: "destructive",
         })
         router.push("/forums")
