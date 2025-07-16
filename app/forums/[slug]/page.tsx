@@ -3,15 +3,18 @@ import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 
 interface ForumPageProps {
-  params: {
-    slug: string
-  }
+  params: { slug: string }
 }
 
 export default async function ForumPage({ params }: ForumPageProps) {
-  const { data: forum } = await supabase.from("forums").select("name, slug").eq("slug", params.slug).single()
+  // 1 Decode & normalize slug
+  const rawSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
+  const slug = decodeURIComponent(rawSlug).toLowerCase()
 
-  if (!forum) {
+  // 2 Query Supabase (graceful error handling)
+  const { data: forum, error } = await supabase.from("forums").select("name, slug").eq("slug", slug).maybeSingle()
+
+  if (error || !forum) {
     notFound()
   }
 
