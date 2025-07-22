@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { motion, AnimatePresence } from "framer-motion"
+import VerificationBadge from "@/components/ui/verification-badge"
 
 interface Thread {
   id: string
@@ -42,6 +43,8 @@ interface Thread {
     username: string
     avatar_url: string
     full_name: string
+    is_verified?: boolean
+    verification_type?: string
   }
   posts: { count: number }[]
 }
@@ -97,7 +100,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
         .from("threads")
         .select(`
             *,
-            profiles(username, avatar_url, full_name),
+            profiles(username, avatar_url, full_name, is_verified, verification_type),
             posts(count)
           `)
         .eq("forum_id", forum.id)
@@ -296,15 +299,20 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                         {thread.profiles?.username?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span
-                      className="text-xs text-gray-500 min-w-0"
-                      style={{
-                        wordBreak: "break-all",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {thread.profiles?.username}
-                    </span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span
+                        className="text-xs text-gray-500 min-w-0"
+                        style={{
+                          wordBreak: "break-all",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {thread.profiles?.username}
+                      </span>
+                      {thread.profiles?.is_verified && thread.profiles?.verification_type && (
+                        <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" />
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
@@ -398,15 +406,20 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                             {thread.profiles?.username?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span
-                          className="min-w-0"
-                          style={{
-                            wordBreak: "break-all",
-                            overflowWrap: "anywhere",
-                          }}
-                        >
-                          {thread.profiles?.username}
-                        </span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span
+                            className="min-w-0"
+                            style={{
+                              wordBreak: "break-all",
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {thread.profiles?.username}
+                          </span>
+                          {thread.profiles?.is_verified && thread.profiles?.verification_type && (
+                            <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" />
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1 whitespace-nowrap">

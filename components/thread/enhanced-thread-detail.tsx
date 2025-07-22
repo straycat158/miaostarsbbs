@@ -13,6 +13,7 @@ import { zhCN } from "date-fns/locale"
 import BlockBasedEditor from "@/components/editor/block-based-editor"
 import Link from "next/link"
 import { toast } from "@/hooks/use-toast"
+import VerificationBadge from "@/components/ui/verification-badge"
 
 interface Thread {
   id: string
@@ -28,6 +29,8 @@ interface Thread {
     username: string
     avatar_url: string
     full_name: string
+    is_verified?: boolean
+    verification_type?: string
   }
   forums: {
     name: string
@@ -45,6 +48,8 @@ interface Post {
     username: string
     avatar_url: string
     full_name: string
+    is_verified?: boolean
+    verification_type?: string
   }
 }
 
@@ -91,7 +96,7 @@ export default function EnhancedThreadDetail({ threadId }: EnhancedThreadDetailP
         .from("threads")
         .select(`
           *,
-          profiles(username, avatar_url, full_name),
+          profiles(username, avatar_url, full_name, is_verified, verification_type),
           forums(name, slug)
         `)
         .eq("id", threadId)
@@ -115,7 +120,7 @@ export default function EnhancedThreadDetail({ threadId }: EnhancedThreadDetailP
         .from("posts")
         .select(`
           *,
-          profiles(username, avatar_url, full_name)
+          profiles(username, avatar_url, full_name, is_verified, verification_type)
         `)
         .eq("thread_id", threadId)
         .order("created_at", { ascending: true })
@@ -149,7 +154,7 @@ export default function EnhancedThreadDetail({ threadId }: EnhancedThreadDetailP
         })
         .select(`
           *,
-          profiles(username, avatar_url, full_name)
+          profiles(username, avatar_url, full_name, is_verified, verification_type)
         `)
         .single()
 
@@ -417,14 +422,19 @@ export default function EnhancedThreadDetail({ threadId }: EnhancedThreadDetailP
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <div
-                  className="font-semibold text-gray-900"
-                  style={{
-                    wordBreak: "break-all",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {thread.profiles?.full_name || thread.profiles?.username || "未知用户"}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div
+                    className="font-semibold text-gray-900"
+                    style={{
+                      wordBreak: "break-all",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {thread.profiles?.full_name || thread.profiles?.username || "未知用户"}
+                  </div>
+                  {thread.profiles?.is_verified && thread.profiles?.verification_type && (
+                    <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" />
+                  )}
                 </div>
                 <div className="text-sm text-gray-500 flex items-center gap-1 flex-wrap">
                   <Clock className="h-3 w-3 flex-shrink-0" />
@@ -475,15 +485,20 @@ export default function EnhancedThreadDetail({ threadId }: EnhancedThreadDetailP
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-3 flex-wrap">
-                        <span
-                          className="font-medium text-gray-900"
-                          style={{
-                            wordBreak: "break-all",
-                            overflowWrap: "anywhere",
-                          }}
-                        >
-                          {post.profiles?.full_name || post.profiles?.username || "未知用户"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="font-medium text-gray-900"
+                            style={{
+                              wordBreak: "break-all",
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {post.profiles?.full_name || post.profiles?.username || "未知用户"}
+                          </span>
+                          {post.profiles?.is_verified && post.profiles?.verification_type && (
+                            <VerificationBadge verificationType={post.profiles.verification_type} size="sm" />
+                          )}
+                        </div>
                         <span className="text-sm text-gray-500 tabular-nums">#{index + 1}</span>
                         <span className="text-sm text-gray-500 whitespace-nowrap">
                           {formatDistanceToNow(new Date(post.created_at), {
