@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import Link from "next/link"
+import VerificationBadge from "@/components/ui/verification-badge"
 
 interface ProfileData {
   id: string
@@ -22,6 +23,9 @@ interface ProfileData {
   role: string
   location?: string
   website?: string
+  is_verified: boolean
+  verification_type?: string
+  verification_note?: string
 }
 
 interface ProfileViewProps {
@@ -123,8 +127,14 @@ export default function ProfileView({ username }: ProfileViewProps) {
 
             <div className="flex-1 space-y-3">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+                  {profile.is_verified && profile.verification_type && (
+                    <VerificationBadge verificationType={profile.verification_type} showLabel />
+                  )}
+                </div>
                 <p className="text-gray-600">@{profile.username}</p>
+                {profile.verification_note && <p className="text-sm text-blue-600 mt-1">{profile.verification_note}</p>}
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
@@ -152,6 +162,11 @@ export default function ProfileView({ username }: ProfileViewProps) {
                       编辑资料
                     </Link>
                   </Button>
+                  {!profile.is_verified && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/verification">申请认证</Link>
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

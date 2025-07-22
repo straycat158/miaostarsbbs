@@ -23,7 +23,12 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
   }
 
   .dark {
@@ -46,6 +51,11 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -55,189 +65,130 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-@layer utilities {
-  .line-clamp-1 {
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+/* Custom text wrapping utilities */
+.break-anywhere {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.text-wrap-all {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Image size constraints */
+.img-constrained {
+  max-width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.img-thumbnail {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: cover;
+}
+
+.img-preview {
+  max-width: 400px;
+  max-height: 300px;
+  object-fit: contain;
+}
+
+/* Line clamping with proper word breaking */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* Responsive text handling */
+@media (max-width: 640px) {
+  .text-responsive {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .bg-grid-pattern {
-    background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.15) 1px, transparent 0);
-    background-size: 20px 20px;
-  }
-
-  /* Enhanced button interactions */
-  .btn-interactive {
-    @apply transition-all duration-200 ease-in-out;
-    @apply hover:scale-105 active:scale-95;
-    @apply hover:shadow-md active:shadow-sm;
-  }
-
-  /* Improved focus states */
-  button:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible {
-    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
-  }
-
-  /* Enhanced card hover effects */
-  .card-interactive {
-    @apply transition-all duration-300 ease-out;
-    @apply hover:shadow-lg hover:-translate-y-1;
-  }
-
-  /* Smooth color transitions */
-  .color-transition {
-    @apply transition-colors duration-200 ease-in-out;
-  }
-
-  /* Loading states */
-  .loading-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  /* Enhanced form elements */
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  textarea,
-  select {
-    @apply transition-all duration-200;
-    @apply hover:border-gray-400 focus:border-primary;
-  }
-
-  /* Improved spacing and typography */
-  .prose-enhanced {
-    @apply leading-relaxed;
-  }
-
-  .prose-enhanced h1,
-  .prose-enhanced h2,
-  .prose-enhanced h3 {
-    @apply font-semibold text-gray-900;
-    line-height: 1.3;
-  }
-
-  .prose-enhanced p {
-    @apply text-gray-700;
-    line-height: 1.7;
-  }
-
-  /* Better mobile touch targets */
-  @media (max-width: 768px) {
-    button,
-    .btn,
-    a[role="button"] {
-      min-height: 44px;
-      min-width: 44px;
-    }
-  }
-
-  /* Skeleton loading improvements */
-  .skeleton {
-    @apply bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200;
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
-    }
-    100% {
-      background-position: 200% 0;
-    }
-  }
-
-  /* Enhanced shadows */
-  .shadow-soft {
-    box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
-  }
-
-  .shadow-medium {
-    box-shadow: 0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  }
-
-  .shadow-strong {
-    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 2px 10px -2px rgba(0, 0, 0, 0.05);
+  .title-responsive {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
   }
 }
 
-/* Chinese font optimization */
-.font-sans {
-  font-family: var(--font-noto-sans-sc), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-}
-
-/* Better line height for Chinese text */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  line-height: 1.4;
-}
-
-p {
-  line-height: 1.7;
-}
-
-/* Improved spacing for Chinese characters */
-.text-lg {
-  letter-spacing: 0.01em;
-}
-
-.text-xl {
-  letter-spacing: 0.01em;
-}
-
-/* Smooth animations */
+/* Ensure proper text wrapping in all contexts */
 * {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
-    transform, filter, backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Specific handling for long URLs and code */
+.force-wrap {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap;
+  hyphens: auto;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+/* Image container constraints */
+.image-container {
+  max-width: 100%;
+  overflow: hidden;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-  transition: background 0.2s ease;
+.image-container img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+/* Thread and post content styling */
+.content-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* Username and title handling */
+.username-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.title-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  line-height: 1.3;
 }

@@ -1,383 +1,223 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Search, Filter, Grid3X3, List, Download, Clock, Star, RefreshCw, AlertCircle, Package } from "lucide-react"
-import {
-  searchProjects,
-  type ModrinthProject,
-  type ProjectType,
-  type SortIndex,
-  CATEGORIES,
-  MINECRAFT_VERSIONS,
-} from "@/lib/modrinth-api"
+import { Search, Grid, List, Package, Loader2 } from "lucide-react"
 import ResourceCard from "./resource-card"
-import LoadingSpinner from "@/components/ui/loading-spinner"
-import { EnhancedButton } from "@/components/ui/enhanced-button"
+import { getProjects, type ModrinthProject } from "@/lib/modrinth-api"
+import { toast } from "@/hooks/use-toast"
 
 export default function ResourceCenter() {
-  const [projects, setProjects] = useState<ModrinthProject[]>([])
+  const [resources, setResources] = useState<ModrinthProject[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [hasActiveSearch, setHasActiveSearch] = useState(false)
-
-  // Search and filter states
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedProjectType, setSelectedProjectType] = useState<ProjectType>("all")
+  const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedVersion, setSelectedVersion] = useState<string>("all")
-  const [sortBy, setSortBy] = useState<SortIndex>("relevance")
-  const [currentPage, setCurrentPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [sortBy, setSortBy] = useState<string>("relevance")
 
-  const ITEMS_PER_PAGE = 20
-
-  // Load initial data
   useEffect(() => {
-    loadInitialData()
+    fetchResources()
   }, [])
 
-  // Search when filters change
-  useEffect(() => {
-    if (!loading) {
-      handleSearch(true)
-    }
-  }, [selectedProjectType, selectedCategory, selectedVersion, sortBy])
-
-  const loadInitialData = async () => {
+  const fetchResources = async () => {
     try {
       setLoading(true)
-      setError(null)
-      setHasActiveSearch(false)
-      setCurrentPage(0) // 添加：重置页码
-
-      const initial = await searchProjects({ limit: ITEMS_PER_PAGE, index: "downloads" })
-      setProjects(initial.hits)
-      setHasMore(initial.hits.length === ITEMS_PER_PAGE)
-      setCurrentPage(1) // 添加：设置为第1页
-    } catch (err: any) {
-      console.error("Error loading initial data:", err)
-      setError("加载资源时出现错误，请稍后重试")
+      const data = await getProjects()
+      setResources(data)
+    } catch (error: any) {
+      console.error("Error fetching resources:", error)
+      toast({
+        title: "加载失败",
+        description: "无法加载资源列表",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = async (reset = false) => {
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      fetchResources()
+      return
+    }
+
     try {
-      setSearchLoading(true)
-      setError(null)
-
-      // 检查是否有活跃的搜索条件
-      const isActiveSearch =
-        searchQuery.trim() !== "" ||
-        selectedProjectType !== "all" ||
-        selectedCategory !== "all" ||
-        selectedVersion !== "all" ||
-        sortBy !== "downloads"
-
-      setHasActiveSearch(isActiveSearch)
-
-      // 修复：重置时将 currentPage 设为 0，非重置时使用当前页
-      const offset = reset ? 0 : currentPage * ITEMS_PER_PAGE
-
-      const searchParams = {
-        query: searchQuery,
-        projectType: selectedProjectType,
+      setLoading(true)
+      const data = await getProjects({
+        query: searchTerm,
         categories: selectedCategory !== "all" ? [selectedCategory] : [],
         versions: selectedVersion !== "all" ? [selectedVersion] : [],
-        index: sortBy,
-        offset,
-        limit: ITEMS_PER_PAGE,
-      }
-
-      const data = await searchProjects(searchParams)
-
-      if (reset) {
-        setProjects(data.hits)
-        setCurrentPage(1) // 修复：重置后设为第1页（因为已经加载了第0页）
-      } else {
-        setProjects((prev) => [...prev, ...data.hits])
-        setCurrentPage((prev) => prev + 1) // 修复：加载更多时递增页码
-      }
-
-      setHasMore(data.hits.length === ITEMS_PER_PAGE)
-    } catch (err: any) {
-      console.error("Error searching projects:", err)
-      setError("搜索失败，请检查网络连接后重试")
+      })
+      setResources(data)
+    } catch (error: any) {
+      console.error("Error searching resources:", error)
+      toast({
+        title: "搜索失败",
+        description: "搜索时出现错误",
+        variant: "destructive",
+      })
     } finally {
-      setSearchLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    handleSearch(true)
+  const handleClearFilters = () => {
+    setSearchTerm("")
+    setSelectedCategory("all")
+    setSelectedVersion("all")
+    setSortBy("relevance")
+    fetchResources()
   }
 
-  const handleLoadMore = () => {
-    if (!searchLoading && hasMore) {
-      handleSearch(false)
+  const filteredResources = resources.sort((a, b) => {
+    switch (sortBy) {
+      case "downloads":
+        return b.downloads - a.downloads
+      case "updated":
+        return new Date(b.date_modified).getTime() - new Date(a.date_modified).getTime()
+      case "created":
+        return new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+      case "name":
+        return a.title.localeCompare(b.title)
+      default:
+        return 0
     }
-  }
-
-  const handleRetry = () => {
-    if (projects.length === 0) {
-      loadInitialData()
-    } else {
-      handleSearch(true)
-    }
-  }
-
-  const getAvailableCategories = () => {
-    if (selectedProjectType === "all") {
-      return Object.values(CATEGORIES).flat()
-    }
-    return CATEGORIES[selectedProjectType as keyof typeof CATEGORIES] || []
-  }
+  })
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center py-16">
-          <LoadingSpinner size="lg" variant="forum" text="正在加载资源中心..." />
-        </div>
+      <div className="space-y-6">
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-gray-600">正在加载资源...</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-            <Package className="h-6 w-6 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">资源中心</h1>
-        </div>
-        {!hasActiveSearch && (
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            探索来自 Modrinth 的优质 Minecraft 资源，包括模组、整合包、资源包和着色器
-          </p>
-        )}
-      </div>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={handleRetry}>
-              <RefreshCw className="h-3 w-3 mr-1" />
-              重试
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Search and Filters */}
-      <Card className="border-0 shadow-soft hover:shadow-medium transition-all duration-300">
-        <CardContent className="p-8">
-          <div className="space-y-6">
+    <div className="space-y-6">
+      {/* Search and Filter Controls */}
+      <Card className="border border-gray-200 shadow-sm">
+        <CardContent className="p-4">
+          <div className="space-y-4">
             {/* Search Bar */}
-            <form onSubmit={handleSearchSubmit} className="flex gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="搜索模组、整合包、资源包..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-12 text-base border-2 hover:border-primary/50 focus:border-primary transition-all duration-200"
+                  placeholder="搜索资源..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                  className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
-              <EnhancedButton type="submit" disabled={searchLoading} size="lg" className="px-8">
-                {searchLoading ? <LoadingSpinner size="sm" /> : <Search className="h-5 w-5" />}
-              </EnhancedButton>
-            </form>
+              <Button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700 text-white">
+                搜索
+              </Button>
+            </div>
 
             {/* Filters */}
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                <Select
-                  value={selectedProjectType}
-                  onValueChange={(value) => setSelectedProjectType(value as ProjectType)}
-                >
-                  <SelectTrigger className="w-full sm:w-40 h-11 border-2 hover:border-primary/50 transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部类型</SelectItem>
-                    <SelectItem value="mod">模组</SelectItem>
-                    <SelectItem value="modpack">整合包</SelectItem>
-                    <SelectItem value="resourcepack">资源包</SelectItem>
-                    <SelectItem value="shader">着色器</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-48 border-gray-300">
+                  <SelectValue placeholder="项目类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有类型</SelectItem>
+                  <SelectItem value="mod">模组</SelectItem>
+                  <SelectItem value="resourcepack">资源包</SelectItem>
+                  <SelectItem value="datapack">数据包</SelectItem>
+                  <SelectItem value="shader">光影</SelectItem>
+                </SelectContent>
+              </Select>
 
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full sm:w-40 h-11 border-2 hover:border-primary/50 transition-colors">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部分类</SelectItem>
-                    {getAvailableCategories().map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select value={selectedVersion} onValueChange={setSelectedVersion}>
+                <SelectTrigger className="w-full sm:w-48 border-gray-300">
+                  <SelectValue placeholder="游戏版本" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有版本</SelectItem>
+                  <SelectItem value="1.20.1">1.20.1</SelectItem>
+                  <SelectItem value="1.19.4">1.19.4</SelectItem>
+                  <SelectItem value="1.18.2">1.18.2</SelectItem>
+                  <SelectItem value="1.16.5">1.16.5</SelectItem>
+                </SelectContent>
+              </Select>
 
-                <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-                  <SelectTrigger className="w-full sm:w-32 h-11 border-2 hover:border-primary/50 transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部版本</SelectItem>
-                    {MINECRAFT_VERSIONS.map((version) => (
-                      <SelectItem key={version} value={version}>
-                        {version}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full sm:w-48 border-gray-300">
+                  <SelectValue placeholder="排序方式" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">相关性</SelectItem>
+                  <SelectItem value="downloads">下载量</SelectItem>
+                  <SelectItem value="updated">最近更新</SelectItem>
+                  <SelectItem value="created">最新发布</SelectItem>
+                  <SelectItem value="name">名称</SelectItem>
+                </SelectContent>
+              </Select>
 
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortIndex)}>
-                  <SelectTrigger className="w-full sm:w-32 h-11 border-2 hover:border-primary/50 transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="relevance">相关性</SelectItem>
-                    <SelectItem value="downloads">
-                      <div className="flex items-center gap-2">
-                        <Download className="h-4 w-4" />
-                        下载量
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="follows">
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4" />
-                        关注量
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="updated">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        最新更新
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="newest">最新发布</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-3 bg-gray-50 p-1 rounded-lg">
-                <EnhancedButton
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("grid")}
-                  className="transition-all duration-200"
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </EnhancedButton>
-                <EnhancedButton
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("list")}
-                  className="transition-all duration-200"
-                >
-                  <List className="h-4 w-4" />
-                </EnhancedButton>
-              </div>
+              <Button variant="outline" onClick={handleClearFilters} className="border-gray-300 bg-transparent">
+                清除筛选
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Results */}
-      <div className="space-y-6">
-        {/* Results count */}
-        <div className="flex items-center justify-between">
-          <div>
-            {hasActiveSearch ? (
-              <p className="text-sm text-gray-600">
-                {projects.length > 0 ? `找到 ${projects.length} 个搜索结果` : "未找到匹配的资源"}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-600">
-                {projects.length > 0 ? `热门资源 (${projects.length})` : "暂无资源"}
-              </p>
-            )}
-          </div>
-          {searchLoading && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <LoadingSpinner size="sm" />
-              搜索中...
-            </div>
-          )}
+      {/* View Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">找到 {filteredResources.length} 个资源</span>
         </div>
-
-        {/* Projects Grid/List */}
-        {projects.length > 0 ? (
-          <div
-            className={viewMode === "grid" ? "grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "space-y-4"}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "grid" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            className={viewMode === "grid" ? "bg-blue-600 text-white" : "border-gray-300"}
           >
-            {projects.map((project) => (
-              <ResourceCard key={project.slug} project={project} variant={viewMode} />
-            ))}
-          </div>
-        ) : !searchLoading && !loading ? (
-          <Card className="border-0 shadow-sm bg-gray-50">
-            <CardContent className="text-center py-16">
-              <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">未找到匹配的资源</h3>
-              <p className="text-gray-600 mb-4">尝试调整搜索条件或筛选选项</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchQuery("")
-                  setSelectedProjectType("all")
-                  setSelectedCategory("all")
-                  setSelectedVersion("all")
-                  setSortBy("downloads")
-                  setHasActiveSearch(false)
-                  setCurrentPage(0) // 添加：重置页码
-                  handleSearch(true)
-                }}
-              >
-                清除筛选条件
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {/* Load More */}
-        {hasMore && projects.length > 0 && (
-          <div className="text-center">
-            <Button variant="outline" onClick={handleLoadMore} disabled={searchLoading} size="lg">
-              {searchLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  加载中...
-                </>
-              ) : (
-                "加载更多"
-              )}
-            </Button>
-          </div>
-        )}
+            <Grid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className={viewMode === "list" ? "bg-blue-600 text-white" : "border-gray-300"}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Resources Display */}
+      {filteredResources.length === 0 ? (
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-12 text-center">
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">暂无资源</h3>
+            <p className="text-gray-500 mb-6">{searchTerm ? "没有找到匹配的资源" : "暂时没有可用的资源"}</p>
+            <Button onClick={handleClearFilters} variant="outline" className="border-gray-300 bg-transparent">
+              重新加载
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+          {filteredResources.map((project) => (
+            <ResourceCard key={project.slug} project={project} variant={viewMode} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,326 +1,276 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, MessageSquare, Users2, Search, Sparkles } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MessageSquare, Clock, Search, Plus, Eye, MessageCircle } from "lucide-react"
+import Link from "next/link"
 import { supabase } from "@/lib/supabase"
-import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "@/hooks/use-toast"
 
 interface Forum {
   id: string
   name: string
   description: string
   slug: string
+  created_at: string
+  created_by: string
   cover_image?: string
-  thread_count?: number
-  latest_thread?: {
-    title: string
-    created_at: string
-    profiles: {
-      username: string
-    }
+  category?: string
+  creator?: {
+    username: string
+    avatar_url?: string
+  }
+  _count?: {
+    threads: number
+    replies: number
   }
 }
 
 export default function EnhancedForumList() {
   const [forums, setForums] = useState<Forum[]>([])
-  const [filteredForums, setFilteredForums] = useState<Forum[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [hoveredForum, setHoveredForum] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("newest")
 
   useEffect(() => {
     fetchForums()
   }, [])
 
-  useEffect(() => {
-    const filtered = forums.filter(
-      (forum) =>
-        forum.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        forum.description.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-    setFilteredForums(filtered)
-  }, [forums, searchQuery])
-
   const fetchForums = async () => {
-    const { data: forumsData, error } = await supabase
-      .from("forums")
-      .select(`
-        *,
-        threads(count)
-      `)
-      .order("created_at", { ascending: true })
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("forums")
+        .select(`
+          *,
+          creator:profiles!forums_created_by_fkey(username, avatar_url)
+        `)
+        .order("created_at", { ascending: false })
 
-    if (error) {
+      if (error) throw error
+
+      // Get thread counts for each forum
+      const forumsWithCounts = await Promise.all(
+        (data || []).map(async (forum) => {
+          const { count: threadCount } = await supabase
+            .from("threads")
+            .select("*", { count: "exact", head: true })
+            .eq("forum_id", forum.id)
+
+          return {
+            ...forum,
+            _count: {
+              threads: threadCount || 0,
+              replies: 0, // We can add reply count later if needed
+            },
+          }
+        }),
+      )
+
+      setForums(forumsWithCounts)
+    } catch (error: any) {
       console.error("Error fetching forums:", error)
-    } else {
-      const formatted = (forumsData || []).map((forum: any) => ({
-        ...forum,
-        thread_count: forum.threads?.[0]?.count ?? 0,
-      }))
-      setForums(formatted)
-      setFilteredForums(formatted)
+      toast({
+        title: "加载失败",
+        description: "无法加载版块列表",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut",
-      },
-    },
-  }
+  const filteredAndSortedForums = forums
+    .filter((forum) => {
+      const matchesSearch =
+        forum.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        forum.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesCategory = selectedCategory === "all" || forum.category === selectedCategory
+      return matchesSearch && matchesCategory
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case "oldest":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case "most_active":
+          return (b._count?.threads || 0) - (a._count?.threads || 0)
+        case "name":
+          return a.name.localeCompare(b.name)
+        default:
+          return 0
+      }
+    })
 
   if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
-          </div>
-          <div className="h-10 bg-gray-200 rounded w-24 animate-pulse"></div>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-48 bg-gray-200"></div>
-              <CardContent className="p-4 space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-full"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="space-y-4">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 bg-gray-200 rounded-lg"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-      >
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-gray-900">论坛版块</h1>
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-            >
-              <Sparkles className="h-6 w-6 text-yellow-500" />
-            </motion.div>
+    <div className="space-y-6">
+      {/* Search and Filter Controls */}
+      <Card className="border border-gray-200 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="搜索版块..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full sm:w-48 border-gray-300">
+                <SelectValue placeholder="选择分类" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">所有分类</SelectItem>
+                <SelectItem value="general">综合讨论</SelectItem>
+                <SelectItem value="technology">科技前沿</SelectItem>
+                <SelectItem value="gaming">游戏天地</SelectItem>
+                <SelectItem value="lifestyle">生活方式</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full sm:w-48 border-gray-300">
+                <SelectValue placeholder="排序方式" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">最新创建</SelectItem>
+                <SelectItem value="oldest">最早创建</SelectItem>
+                <SelectItem value="most_active">最活跃</SelectItem>
+                <SelectItem value="name">按名称</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-gray-600 text-lg">探索我们的社区讨论</p>
-        </div>
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button asChild className="self-start sm:self-auto shadow-lg">
-            <Link href="/forums/create">
-              <Plus className="mr-2 h-4 w-4" />
-              创建版块
-            </Link>
+        </CardContent>
+      </Card>
+
+      {/* Create Forum Button */}
+      <div className="flex justify-end">
+        <Link href="/forums/create">
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Plus className="mr-2 h-4 w-4" />
+            创建新版块
           </Button>
-        </motion.div>
-      </motion.div>
-
-      {/* Search */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="relative max-w-md"
-      >
-        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="搜索版块..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 shadow-sm"
-        />
-      </motion.div>
-
-      {/* Results count */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-sm text-gray-600"
-      >
-        共找到 {filteredForums.length} 个版块
-      </motion.div>
+        </Link>
+      </div>
 
       {/* Forums Grid */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={searchQuery}
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-        >
-          {filteredForums.map((forum) => (
-            <motion.div
-              key={forum.id}
-              variants={itemVariants}
-              layout
-              onHoverStart={() => setHoveredForum(forum.id)}
-              onHoverEnd={() => setHoveredForum(null)}
-              className="group"
-            >
-              <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white overflow-hidden h-full">
-                {/* Cover Image */}
-                <div className="relative h-48 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden">
-                  {forum.cover_image ? (
-                    <motion.img
-                      src={forum.cover_image}
-                      alt={forum.name}
-                      className="w-full h-full object-cover"
-                      whileHover={{ scale: 1.05 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <motion.div
-                        animate={{
-                          scale: hoveredForum === forum.id ? 1.1 : 1,
-                          rotate: hoveredForum === forum.id ? 5 : 0,
-                        }}
-                        transition={{ duration: 0.3 }}
-                        className="text-center text-gray-400"
-                      >
-                        <MessageSquare className="h-16 w-16 mx-auto mb-3" />
-                        <p className="text-sm font-medium">讨论版块</p>
-                      </motion.div>
-                    </div>
-                  )}
-
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-
-                  {/* Hover overlay */}
-                  <AnimatePresence>
-                    {hoveredForum === forum.id && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-blue-600/20 flex items-center justify-center"
-                      >
-                        <motion.div
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                          className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium text-gray-700"
-                        >
-                          点击进入版块
-                        </motion.div>
-                      </motion.div>
+      {filteredAndSortedForums.length === 0 ? (
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-12 text-center">
+            <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">暂无版块</h3>
+            <p className="text-gray-500 mb-6">
+              {searchTerm || selectedCategory !== "all" ? "没有找到匹配的版块" : "还没有创建任何版块"}
+            </p>
+            <Link href="/forums/create">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Plus className="mr-2 h-4 w-4" />
+                创建第一个版块
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredAndSortedForums.map((forum) => (
+            <Card key={forum.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  {/* Forum Cover */}
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {forum.cover_image ? (
+                      <img
+                        src={forum.cover_image || "/placeholder.svg"}
+                        alt={forum.name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <MessageSquare className="h-8 w-8 text-white" />
                     )}
-                  </AnimatePresence>
+                  </div>
 
-                  {/* Thread count badge */}
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium text-gray-700">
-                    {forum.thread_count} 个主题
+                  {/* Forum Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <Link href={`/forums/${forum.slug}`}>
+                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1">
+                          {forum.name}
+                        </h3>
+                      </Link>
+                      {forum.category && (
+                        <Badge variant="secondary" className="ml-2 bg-gray-100 text-gray-700">
+                          {forum.category}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{forum.description}</p>
+
+                    {/* Forum Stats */}
+                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="h-4 w-4" />
+                        <span>{forum._count?.threads || 0} 主题</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>{new Date(forum.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Creator Info */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={forum.creator?.avatar_url || "/placeholder.svg"} />
+                          <AvatarFallback className="text-xs">
+                            {forum.creator?.username?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-gray-600">{forum.creator?.username || "未知用户"}</span>
+                      </div>
+                      <Link href={`/forums/${forum.slug}`}>
+                        <Button variant="outline" size="sm" className="border-gray-300 bg-transparent">
+                          <Eye className="mr-1 h-3 w-3" />
+                          查看
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
-
-                {/* Content */}
-                <CardContent className="p-6 flex-1 flex flex-col">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl mb-3">
-                      <Link
-                        href={`/forums/${forum.slug}`}
-                        className="text-gray-900 hover:text-blue-600 transition-colors group-hover:text-blue-600"
-                      >
-                        {forum.name}
-                      </Link>
-                    </CardTitle>
-                    <CardDescription className="text-gray-600 text-base leading-relaxed line-clamp-3">
-                      {forum.description}
-                    </CardDescription>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <MessageSquare className="h-4 w-4" />
-                      <span className="font-medium">{forum.thread_count || 0}</span>
-                      <span>个主题</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
-                      <Users2 className="h-3 w-3" />
-                      <span>活跃讨论</span>
-                    </div>
-                  </div>
-
-                  {/* Activity indicator */}
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: hoveredForum === forum.id ? "100%" : "0%" }}
-                    transition={{ duration: 0.3 }}
-                    className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mt-3"
-                  />
-                </CardContent>
-              </Card>
-            </motion.div>
+              </CardContent>
+            </Card>
           ))}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Empty State */}
-      {filteredForums.length === 0 && !loading && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="text-center py-16 bg-gray-50 rounded-2xl"
-        >
-          <div className="max-w-md mx-auto">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="mx-auto mb-6 h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center"
-            >
-              <MessageSquare className="h-8 w-8 text-gray-400" />
-            </motion.div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {searchQuery ? "未找到匹配的版块" : "暂无版块"}
-            </h3>
-            <p className="text-gray-600 mb-6">
-              {searchQuery ? "尝试使用不同的关键词搜索" : "成为第一个创建版块的用户！"}
-            </p>
-            {!searchQuery && (
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button asChild size="lg">
-                  <Link href="/forums/create">创建版块</Link>
-                </Button>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
+        </div>
       )}
     </div>
   )

@@ -87,6 +87,24 @@ export const searchProjects = async (params: SearchParams = {}): Promise<Modrint
   return response.json()
 }
 
+/**
+ * Fetch a list of projects (convenience wrapper used by ResourceCenter).
+ * Falls back to `getRandomProjects` if the search API returns nothing or fails.
+ */
+export const getProjects = async (params: SearchParams = {}): Promise<ModrinthProject[]> => {
+  try {
+    const { hits } = await searchProjects(params)
+    if (Array.isArray(hits) && hits.length > 0) {
+      return hits
+    }
+  } catch {
+    /* ignore — we’ll fall back below */
+  }
+
+  // Fallback: return popular/random projects so UI always has data
+  return getRandomProjects(params.limit ?? 20)
+}
+
 export const getRandomProjects = async (count = 8): Promise<ModrinthProject[]> => {
   // 1. First try the official random-projects endpoint.
   try {

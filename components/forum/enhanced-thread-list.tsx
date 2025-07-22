@@ -75,7 +75,6 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
   const fetchThreads = async () => {
     try {
       console.log("Fetching threads for forum:", forumSlug)
-      // Use maybeSingle to handle cases where the forum might not be found
       const { data: forum, error: forumError } = await supabase
         .from("forums")
         .select("id")
@@ -84,13 +83,13 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
 
       if (forumError) {
         console.error("Error fetching forum in EnhancedThreadList:", forumError)
-        setThreads([]) // Ensure threads are empty on forum fetch error
+        setThreads([])
         return
       }
 
       if (!forum) {
         console.warn(`Forum with slug "${forumSlug}" not found.`)
-        setThreads([]) // Ensure threads are empty if forum is not found
+        setThreads([])
         return
       }
 
@@ -133,7 +132,6 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
       return matchesSearch && matchesCategory
     })
 
-    // Sort threads
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "popular":
@@ -183,16 +181,17 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
       onHoverEnd={() => setHoveredThread(null)}
       className="group"
     >
-      <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white overflow-hidden">
+      <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white overflow-hidden h-full">
         {viewMode === "grid" ? (
-          <div className="relative">
+          <div className="relative h-full flex flex-col">
             {/* Cover Image */}
-            <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden">
+            <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden flex-shrink-0">
               {thread.cover_image ? (
                 <motion.img
                   src={thread.cover_image}
                   alt={thread.title}
                   className="w-full h-full object-cover"
+                  style={{ maxWidth: "100%", height: "100%", objectFit: "cover" }}
                   whileHover={{ scale: 1.05 }}
                   transition={{ duration: 0.3 }}
                 />
@@ -206,10 +205,10 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
               )}
 
               {/* Overlay with badges */}
-              <div className="absolute top-3 left-3 flex gap-2">
+              <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
                 {thread.is_pinned && (
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2 }}>
-                    <Badge className="bg-red-500 text-white shadow-lg">
+                    <Badge className="bg-red-500 text-white shadow-lg text-xs">
                       <Pin className="mr-1 h-3 w-3" />
                       置顶
                     </Badge>
@@ -217,7 +216,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                 )}
                 {thread.is_locked && (
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}>
-                    <Badge variant="outline" className="bg-white/90 border-gray-300">
+                    <Badge variant="outline" className="bg-white/90 border-gray-300 text-xs">
                       <Lock className="mr-1 h-3 w-3" />
                       已锁定
                     </Badge>
@@ -260,39 +259,67 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
             </div>
 
             {/* Content */}
-            <CardContent className="p-4">
-              <div className="space-y-3">
+            <CardContent className="p-4 flex-1 flex flex-col">
+              <div className="space-y-3 flex-1">
                 <Link
                   href={`/forums/${forumSlug}/threads/${thread.id}`}
                   className="block group-hover:text-blue-600 transition-colors"
                 >
-                  <h3 className="font-semibold text-lg leading-tight line-clamp-2">{thread.title}</h3>
+                  <h3
+                    className="font-semibold text-lg leading-tight line-clamp-2"
+                    style={{
+                      wordBreak: "break-all",
+                      overflowWrap: "anywhere",
+                      hyphens: "auto",
+                    }}
+                  >
+                    {thread.title}
+                  </h3>
                 </Link>
 
-                <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">{thread.content}</p>
+                <p
+                  className="text-gray-600 text-sm line-clamp-3 leading-relaxed flex-1"
+                  style={{
+                    wordBreak: "break-all",
+                    overflowWrap: "anywhere",
+                    hyphens: "auto",
+                  }}
+                >
+                  {thread.content}
+                </p>
 
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
+                <div className="flex items-center justify-between pt-2 mt-auto">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Avatar className="h-6 w-6 flex-shrink-0">
                       <AvatarImage src={thread.profiles?.avatar_url || "/placeholder.svg"} />
                       <AvatarFallback className="text-xs">
                         {thread.profiles?.username?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs text-gray-500">{thread.profiles?.username}</span>
+                    <span
+                      className="text-xs text-gray-500 min-w-0"
+                      style={{
+                        wordBreak: "break-all",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {thread.profiles?.username}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
-                      {thread.posts?.[0]?.count || 0}
+                      <span className="tabular-nums">{thread.posts?.[0]?.count || 0}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {formatDistanceToNow(new Date(thread.created_at), {
-                        addSuffix: true,
-                        locale: zhCN,
-                      })}
+                      <span className="whitespace-nowrap">
+                        {formatDistanceToNow(new Date(thread.created_at), {
+                          addSuffix: true,
+                          locale: zhCN,
+                        })}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -311,6 +338,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                       src={thread.cover_image || "/placeholder.svg"}
                       alt={thread.title}
                       className="w-full h-full object-cover"
+                      style={{ maxWidth: "64px", maxHeight: "64px", objectFit: "cover" }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -323,16 +351,16 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
                       {thread.is_pinned && (
-                        <Badge variant="secondary" className="bg-red-50 text-red-700 border-red-200">
+                        <Badge variant="secondary" className="bg-red-50 text-red-700 border-red-200 text-xs">
                           <Pin className="mr-1 h-3 w-3" />
                           置顶
                         </Badge>
                       )}
                       {thread.is_locked && (
-                        <Badge variant="outline" className="border-gray-300">
+                        <Badge variant="outline" className="border-gray-300 text-xs">
                           <Lock className="mr-1 h-3 w-3" />
                           已锁定
                         </Badge>
@@ -341,37 +369,61 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
 
                     <Link
                       href={`/forums/${forumSlug}/threads/${thread.id}`}
-                      className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1"
+                      className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 block"
+                      style={{
+                        wordBreak: "break-all",
+                        overflowWrap: "anywhere",
+                        hyphens: "auto",
+                      }}
                     >
                       {thread.title}
                     </Link>
 
-                    <p className="text-gray-600 text-sm mt-1 line-clamp-2">{thread.content}</p>
+                    <p
+                      className="text-gray-600 text-sm mt-1 line-clamp-2"
+                      style={{
+                        wordBreak: "break-all",
+                        overflowWrap: "anywhere",
+                        hyphens: "auto",
+                      }}
+                    >
+                      {thread.content}
+                    </p>
 
-                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
+                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar className="h-6 w-6 flex-shrink-0">
                           <AvatarImage src={thread.profiles?.avatar_url || "/placeholder.svg"} />
                           <AvatarFallback className="text-xs">
                             {thread.profiles?.username?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span>{thread.profiles?.username}</span>
+                        <span
+                          className="min-w-0"
+                          style={{
+                            wordBreak: "break-all",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {thread.profiles?.username}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 whitespace-nowrap">
                         <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(thread.created_at), {
-                          addSuffix: true,
-                          locale: zhCN,
-                        })}
+                        <span>
+                          {formatDistanceToNow(new Date(thread.created_at), {
+                            addSuffix: true,
+                            locale: zhCN,
+                          })}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full flex-shrink-0">
                     <MessageSquare className="h-4 w-4" />
-                    <span className="font-medium">{thread.posts?.[0]?.count || 0}</span>
+                    <span className="font-medium tabular-nums">{thread.posts?.[0]?.count || 0}</span>
                     <span>回复</span>
                   </div>
                 </div>
@@ -419,18 +471,35 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
         className="flex flex-col gap-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+          <div className="space-y-2 min-w-0 flex-1">
+            <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-2 flex-wrap">
               <Link href="/forums" className="hover:text-blue-600 transition-colors">
                 版块
               </Link>
               <span>/</span>
-              <span className="text-gray-900">{forumName}</span>
+              <span
+                className="text-gray-900"
+                style={{
+                  wordBreak: "break-all",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {forumName}
+              </span>
             </nav>
-            <h1 className="text-3xl font-bold text-gray-900">{forumName}</h1>
+            <h1
+              className="text-3xl font-bold text-gray-900"
+              style={{
+                wordBreak: "break-all",
+                overflowWrap: "anywhere",
+                hyphens: "auto",
+              }}
+            >
+              {forumName}
+            </h1>
             <p className="text-gray-600 text-lg">版块讨论和主题</p>
           </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex-shrink-0">
             <Button asChild className="self-start sm:self-auto shadow-lg">
               <Link href={`/forums/${forumSlug}/create-thread`}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -447,7 +516,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
           transition={{ duration: 0.5, delay: 0.2 }}
           className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between"
         >
-          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -498,7 +567,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
             </Select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}
               size="sm"
@@ -526,7 +595,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
         transition={{ delay: 0.3 }}
         className="text-sm text-gray-600"
       >
-        共找到 {filteredThreads.length} 个主题
+        共找到 <span className="tabular-nums">{filteredThreads.length}</span> 个主题
       </motion.div>
 
       {/* Threads Grid/List */}
@@ -565,7 +634,13 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {searchQuery || selectedCategory !== "all" ? "未找到匹配的主题" : "暂无主题"}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p
+              className="text-gray-600 mb-6"
+              style={{
+                wordBreak: "break-all",
+                overflowWrap: "anywhere",
+              }}
+            >
               {searchQuery || selectedCategory !== "all" ? "尝试调整搜索条件或筛选选项" : "开始对话，发布第一个主题！"}
             </p>
             {!searchQuery && selectedCategory === "all" && (

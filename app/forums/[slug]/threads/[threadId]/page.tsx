@@ -1,20 +1,27 @@
-import ThreadDetail from "@/components/thread/thread-detail"
-import { Suspense } from "react"
-import LoadingPage from "@/components/ui/loading-page"
+"use client"
 
-interface ThreadPageProps {
-  params: {
-    slug: string
-    threadId: string
+import { useParams } from "next/navigation"
+import EnhancedThreadDetail from "@/components/thread/enhanced-thread-detail"
+
+export default function ThreadDetailPage() {
+  const params = useParams()
+
+  const threadId = Array.isArray(params.threadId) ? params.threadId[0] : params.threadId
+  const forumSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
+
+  if (!threadId || !forumSlug) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-gray-600">无效的页面参数</p>
+        </div>
+      </div>
+    )
   }
-}
-
-export default function ThreadPage({ params }: ThreadPageProps) {
-  console.log("ThreadPage rendered with params:", params)
 
   return (
-    <Suspense fallback={<LoadingPage title="主题加载中..." description="正在获取主题内容..." />}>
-      <ThreadDetail threadId={params.threadId} />
-    </Suspense>
+    <div className="container mx-auto px-4 py-8">
+      <EnhancedThreadDetail threadId={threadId} forumSlug={forumSlug} />
+    </div>
   )
 }

@@ -1,87 +1,176 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { useEffect, useState } from "react"
-import UnifiedContentEditor from "@/components/editor/unified-content-editor"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/hooks/use-toast"
+import BlockBasedEditor from "@/components/editor/block-based-editor"
 
 export default function CreateThreadPage() {
   const router = useRouter()
   const params = useParams()
+  const [user, setUser] = useState<any>(null)
   const [forum, setForum] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchForum = async () => {
-      // Decode and normalize the slug
-      const rawSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
-      const slug = decodeURIComponent(rawSlug).toLowerCase()
+    checkUserAndForum()
+  }, [params.slug])
 
-      const { data, error } = await supabase.from("forums").select("*").eq("slug", slug).maybeSingle()
+  const checkUserAndForum = async () => {
+    try {
+      // Check user authentication
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-      if (error || !data) {
-        console.error("Error fetching forum for thread creation:", error)
+      if (userError || !user) {
+        console.error("User authentication error:", userError)
         toast({
           title: "错误",
-          description: "版块不存在或无法加载",
+          description: "请先登录",
+          variant: "destructive",
+        })
+        router.push("/auth")
+        return
+      }
+
+      // Get forum slug from params
+      const rawSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
+      if (!rawSlug) {
+        toast({
+          title: "错误",
+          description: "无效的版块地址",
           variant: "destructive",
         })
         router.push("/forums")
         return
       }
 
-      setForum(data)
+      // Decode and normalize the slug
+      const slug = decodeURIComponent(rawSlug).toLowerCase()
+      console.log("Looking for forum with slug:", slug)
+
+      // Fetch forum data
+      const { data: forumData, error: forumError } = await supabase
+        .from("forums")
+        .select("*")
+        .eq("slug", slug)
+        .maybeSingle()
+
+      if (forumError) {
+        console.error("Forum fetch error:", forumError)
+        toast({
+          title: "错误",
+          description: "获取版块信息失败",
+          variant: "destructive",
+        })
+        router.push("/forums")
+        return
+      }
+
+      if (!forumData) {
+        console.error("Forum not found for slug:", slug)
+        // Try to find forum with case-insensitive search
+        const { data: alternativeForums, error: altError } = await supabase
+          .from("forums")
+          .select("*")
+          .ilike("slug", slug)
+          .limit(1)
+
+        if (altError || !alternativeForums || alternativeForums.length === 0) {
+          toast({
+            title: "错误",
+            description: "版块不存在",
+            variant: "destructive",
+          })
+          router.push("/forums")
+          return
+        }
+
+        // Use the found forum
+        setForum(alternativeForums[0])
+        setUser(user)
+      } else {
+        setForum(forumData)
+        setUser(user)
+      }
+    } catch (error) {
+      console.error("Error in checkUserAndForum:", error)
+      toast({
+        title: "错误",
+        description: "系统错误，请稍后重试",
+        variant: "destructive",
+      })
+      router.push("/forums")
+    } finally {
       setLoading(false)
     }
-
-    fetchForum()
-  }, [params.slug, router])
+  }
 
   const handleCreateThread = async (content: any) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        toast({
-          title: "错误",
-          description: "请先登录",
-          variant: "destructive",
-        })
-        return
+      if (!user || !forum) {
+        throw new Error("用户或版块信息缺失")
       }
+
+      console.log("Creating thread with content:", content)
 
       const { data, error } = await supabase
         .from("threads")
         .insert({
           title: content.title,
-          content: content.content,
+          content: content.blocks?.find((b: any) => b.type === "text")?.content || "",
           forum_id: forum.id,
           created_by: user.id,
-          is_pinned: content.isPinned || false,
-          is_locked: content.isLocked || false,
-          cover_image: content.coverImage || null,
-          images: content.images || [],
+          blocks: content.blocks,
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error("Thread creation error:", error)
+        throw error
+      }
 
-      router.push(`/forums/${params.slug}/threads/${data.id}`)
+      console.log("Thread created successfully:", data)
+      toast({ title: "主题发布成功！" })
+      router.push(`/forums/${forum.slug}/threads/${data.id}`)
     } catch (error: any) {
-      throw new Error(error.message || "创建主题失败")
+      console.error("Error creating thread:", error)
+      throw new Error(error.message || "发布主题失败")
     }
   }
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+        <div className="flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-gray-600">请先登录</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!forum) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-gray-600">版块不存在</p>
         </div>
       </div>
     )
@@ -89,14 +178,7 @@ export default function CreateThreadPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <UnifiedContentEditor
-        mode="thread"
-        contextId={forum.id}
-        contextData={{
-          forumName: forum.name,
-        }}
-        onPublish={handleCreateThread}
-      />
+      <BlockBasedEditor mode="thread" contextData={{ forumName: forum.name }} onPublish={handleCreateThread} />
     </div>
   )
 }
