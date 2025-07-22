@@ -299,7 +299,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                         {thread.profiles?.username?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex items-center gap-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <span
                         className="text-xs text-gray-500 min-w-0"
                         style={{
@@ -310,7 +310,11 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                         {thread.profiles?.username}
                       </span>
                       {thread.profiles?.is_verified && thread.profiles?.verification_type && (
-                        <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" />
+                        <VerificationBadge
+                          verificationType={thread.profiles.verification_type}
+                          size="sm"
+                          showText={true}
+                        />
                       )}
                     </div>
                   </div>
@@ -406,7 +410,7 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                             {thread.profiles?.username?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex items-center gap-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
                           <span
                             className="min-w-0"
                             style={{
@@ -417,7 +421,11 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                             {thread.profiles?.username}
                           </span>
                           {thread.profiles?.is_verified && thread.profiles?.verification_type && (
-                            <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" />
+                            <VerificationBadge
+                              verificationType={thread.profiles.verification_type}
+                              size="sm"
+                              showText={true}
+                            />
                           )}
                         </div>
                       </div>
