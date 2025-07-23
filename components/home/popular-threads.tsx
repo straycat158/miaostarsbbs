@@ -3,35 +3,36 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { MessageSquare, Clock, ArrowRight, TrendingUp } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { MessageSquare, Eye, ThumbsUp } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import VerificationBadge from "@/components/ui/verification-badge"
 
-interface Thread {
+interface PopularThread {
   id: string
   title: string
   content: string
   created_at: string
-  post_count: number
+  view_count: number
+  reply_count: number
+  like_count: number
   forum: {
     name: string
     slug: string
   }
-  profiles: {
+  author: {
     username: string
     avatar_url: string
-    is_verified: boolean
-    verification_type: string
+    is_verified?: boolean
+    verification_type?: string
   }
 }
 
 export default function PopularThreads() {
-  const [threads, setThreads] = useState<Thread[]>([])
+  const [threads, setThreads] = useState<PopularThread[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,36 +41,56 @@ export default function PopularThreads() {
 
   const fetchPopularThreads = async () => {
     try {
-      const { data: threadsData, error } = await supabase
+      const { data, error } = await supabase
         .from("threads")
         .select(`
           id,
           title,
           content,
           created_at,
-          forums(name, slug),
-          profiles(username, avatar_url, is_verified, verification_type),
-          posts(count)
+          view_count,
+          forums!inner(name, slug),
+          profiles!inner(username, avatar_url, is_verified, verification_type)
         `)
-        .order("count", { foreignTable: "posts", ascending: false })
-        .limit(8)
+        .order("view_count", { ascending: false })
+        .limit(5)
 
       if (error) {
         console.error("Error fetching popular threads:", error)
         return
       }
 
-      const processedThreads = (threadsData || []).map((thread: any) => ({
-        id: thread.id,
-        title: thread.title,
-        content: thread.content,
-        created_at: thread.created_at,
-        post_count: thread.posts?.[0]?.count || 0,
-        forum: thread.forums,
-        profiles: thread.profiles,
-      }))
+      // Get reply counts for each thread
+      const threadsWithCounts = await Promise.all(
+        (data || []).map(async (thread: any) => {
+          const { count: replyCount } = await supabase
+            .from("posts")
+            .select("*", { count: "exact", head: true })
+            .eq("thread_id", thread.id)
 
-      setThreads(processedThreads)
+          return {
+            id: thread.id,
+            title: thread.title,
+            content: thread.content,
+            created_at: thread.created_at,
+            view_count: thread.view_count || 0,
+            reply_count: replyCount || 0,
+            like_count: 0, // TODO: Implement likes system
+            forum: {
+              name: thread.forums.name,
+              slug: thread.forums.slug,
+            },
+            author: {
+              username: thread.profiles.username,
+              avatar_url: thread.profiles.avatar_url,
+              is_verified: thread.profiles.is_verified,
+              verification_type: thread.profiles.verification_type,
+            },
+          }
+        }),
+      )
+
+      setThreads(threadsWithCounts)
     } catch (error) {
       console.error("Error fetching popular threads:", error)
     } finally {
@@ -77,141 +98,107 @@ export default function PopularThreads() {
     }
   }
 
-  const truncateContent = (content: string, maxLength = 100) => {
-    if (content.length <= maxLength) return content
-    return content.substring(0, maxLength) + "..."
+  // 截断用户名函数
+  const truncateUsername = (username: string, maxLength = 10) => {
+    if (username.length <= maxLength) return username
+    return username.slice(0, maxLength) + "..."
   }
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
-        </div>
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-0">
-                <div className="flex">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full m-4"></div>
-                  <div className="flex-1 p-4 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-full"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ThumbsUp className="h-5 w-5 text-orange-500" />
+            热门主题
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="flex gap-3">
+                <div className="h-8 w-8 rounded-full bg-gray-200"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ThumbsUp className="h-5 w-5 text-orange-500" />
           热门主题
-        </h2>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/forums">
-            查看更多
-            <ArrowRight className="ml-1 h-3 w-3" />
-          </Link>
-        </Button>
-      </div>
-
-      {/* Threads Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
         {threads.map((thread, index) => (
           <motion.div
             key={thread.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.05 }}
-            whileHover={{ y: -2 }}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.1 }}
+            className="group"
           >
-            <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200 h-full">
-              <CardContent className="p-0">
-                <div className="flex">
-                  {/* User Avatar */}
-                  <div className="flex-shrink-0 p-3 sm:p-4">
-                    <div className="flex flex-col items-center space-y-1">
-                      <img
-                        src={thread.profiles?.avatar_url || "/placeholder.svg?height=40&width=40"}
-                        alt={thread.profiles?.username}
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
-                      />
-                      <div className="text-center">
-                        <div className="text-xs text-gray-600 truncate max-w-[60px] flex items-center gap-1">
-                          {thread.profiles?.username}
-                          {thread.profiles?.is_verified && (
-                            <VerificationBadge type={thread.profiles.verification_type} size="sm" showText={false} />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Thread Content */}
-                  <div className="flex-1 p-3 sm:p-4 min-w-0">
-                    <div className="space-y-2">
-                      {/* Forum Badge */}
-                      <Badge variant="outline" className="text-xs">
-                        {thread.forum?.name}
-                      </Badge>
-
-                      {/* Title */}
-                      <Link
-                        href={`/forums/${thread.forum?.slug}/threads/${thread.id}`}
-                        className="block font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-2 text-sm sm:text-base leading-tight"
-                      >
-                        {thread.title}
-                      </Link>
-
-                      {/* Content Preview */}
-                      <p className="text-xs sm:text-sm text-gray-600 line-clamp-2 leading-relaxed">
-                        {truncateContent(thread.content)}
-                      </p>
-
-                      {/* Stats */}
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-3 text-xs text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            <span>{thread.post_count}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {formatDistanceToNow(new Date(thread.created_at), {
-                              addSuffix: true,
-                              locale: zhCN,
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            <div className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={thread.author.avatar_url || "/placeholder.svg"} />
+                <AvatarFallback className="text-xs">{thread.author.username.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Link
+                    href={`/profile/${thread.author.username}`}
+                    className="text-sm font-medium text-gray-700 hover:text-blue-600 truncate max-w-[80px]"
+                    title={thread.author.username}
+                  >
+                    {truncateUsername(thread.author.username)}
+                  </Link>
+                  {thread.author.is_verified && thread.author.verification_type && (
+                    <VerificationBadge verificationType={thread.author.verification_type} size="sm" showText={false} />
+                  )}
+                  <span className="text-xs text-gray-500">
+                    {formatDistanceToNow(new Date(thread.created_at), {
+                      addSuffix: true,
+                      locale: zhCN,
+                    })}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
+                <Link
+                  href={`/forums/${thread.forum.slug}/threads/${thread.id}`}
+                  className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-1 group-hover:text-blue-600"
+                >
+                  {thread.title}
+                </Link>
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    {thread.view_count}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3" />
+                    {thread.reply_count}
+                  </span>
+                  <Link
+                    href={`/forums/${thread.forum.slug}`}
+                    className="hover:text-blue-600 truncate max-w-[60px]"
+                    title={thread.forum.name}
+                  >
+                    {thread.forum.name}
+                  </Link>
+                </div>
+              </div>
+            </div>
           </motion.div>
         ))}
-      </div>
-
-      {/* Empty state */}
-      {threads.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-2xl">
-          <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无热门主题</h3>
-          <p className="text-gray-600">快来发布第一个主题吧！</p>
-        </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   )
 }

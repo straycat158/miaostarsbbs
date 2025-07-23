@@ -10,6 +10,7 @@ import { MessageSquare, Clock } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
+import VerificationBadge from "@/components/ui/verification-badge"
 
 interface Activity {
   id: string
@@ -23,6 +24,8 @@ interface Activity {
   user: {
     username: string
     avatar_url: string
+    is_verified?: boolean
+    verification_type?: string
   }
 }
 
@@ -45,7 +48,7 @@ export default function RecentActivity() {
           content,
           created_at,
           forums!inner(name, slug),
-          profiles!inner(username, avatar_url)
+          profiles!inner(username, avatar_url, is_verified, verification_type)
         `)
         .order("created_at", { ascending: false })
         .limit(5)
@@ -62,7 +65,7 @@ export default function RecentActivity() {
           content,
           created_at,
           threads!inner(id, title, forums!inner(name, slug)),
-          profiles!inner(username, avatar_url)
+          profiles!inner(username, avatar_url, is_verified, verification_type)
         `)
         .order("created_at", { ascending: false })
         .limit(5)
@@ -84,6 +87,8 @@ export default function RecentActivity() {
         user: {
           username: thread.profiles.username,
           avatar_url: thread.profiles.avatar_url,
+          is_verified: thread.profiles.is_verified,
+          verification_type: thread.profiles.verification_type,
         },
       }))
 
@@ -100,6 +105,8 @@ export default function RecentActivity() {
         user: {
           username: post.profiles.username,
           avatar_url: post.profiles.avatar_url,
+          is_verified: post.profiles.is_verified,
+          verification_type: post.profiles.verification_type,
         },
       }))
 
@@ -114,6 +121,12 @@ export default function RecentActivity() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 截断用户名函数
+  const truncateUsername = (username: string, maxLength = 12) => {
+    if (username.length <= maxLength) return username
+    return username.slice(0, maxLength) + "..."
   }
 
   if (loading) {
@@ -148,22 +161,30 @@ export default function RecentActivity() {
           <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200">
             <CardContent className="p-4">
               <div className="flex gap-4">
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 flex-shrink-0">
                   <AvatarImage src={activity.user.avatar_url || "/placeholder.svg"} />
                   <AvatarFallback>{activity.user.username.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <Link
                       href={`/profile/${activity.user.username}`}
-                      className="font-medium text-gray-900 hover:text-blue-600"
+                      className="font-medium text-gray-900 hover:text-blue-600 truncate max-w-[120px]"
+                      title={activity.user.username}
                     >
-                      {activity.user.username}
+                      {truncateUsername(activity.user.username)}
                     </Link>
-                    <Badge variant="outline" className="text-xs">
+                    {activity.user.is_verified && activity.user.verification_type && (
+                      <VerificationBadge
+                        verificationType={activity.user.verification_type}
+                        size="sm"
+                        showText={false}
+                      />
+                    )}
+                    <Badge variant="outline" className="text-xs flex-shrink-0">
                       {activity.type === "thread" ? "发布了主题" : "回复了主题"}
                     </Badge>
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-xs text-gray-500 flex items-center gap-1 flex-shrink-0">
                       <Clock className="h-3 w-3" />
                       {formatDistanceToNow(new Date(activity.created_at), {
                         addSuffix: true,
@@ -174,18 +195,20 @@ export default function RecentActivity() {
 
                   <Link
                     href={`/forums/${activity.forum_slug}/threads/${activity.thread_id}`}
-                    className="text-gray-900 hover:text-blue-600 font-medium line-clamp-1"
+                    className="text-gray-900 hover:text-blue-600 font-medium line-clamp-1 block"
                   >
                     {activity.title}
                   </Link>
 
-                  <p className="text-sm text-gray-600 line-clamp-1 mt-1">{activity.content}</p>
+                  <p className="text-sm text-gray-600 line-clamp-2 mt-1">{activity.content}</p>
 
                   <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                     <Link href={`/forums/${activity.forum_slug}`} className="hover:text-blue-600">
                       <span className="flex items-center gap-1">
                         <MessageSquare className="h-3 w-3" />
-                        {activity.forum_name}
+                        <span className="truncate max-w-[100px]" title={activity.forum_name}>
+                          {activity.forum_name}
+                        </span>
                       </span>
                     </Link>
                   </div>

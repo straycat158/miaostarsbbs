@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { Pin, Lock, MessageCircle, Clock, Reply, Flag, Send } from "lucide-react"
+import { Pin, Lock, MessageCircle, Clock, Reply, Flag, Send, Eye, ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import VerificationBadge from "@/components/ui/verification-badge"
 import { toast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 interface Thread {
   id: string
@@ -66,6 +67,7 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
   useEffect(() => {
     fetchCurrentUser()
     fetchThreadAndPosts()
+    incrementViewCount()
   }, [threadId])
 
   const fetchCurrentUser = async () => {
@@ -75,6 +77,14 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
     if (user) {
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
       setCurrentUser(profile)
+    }
+  }
+
+  const incrementViewCount = async () => {
+    try {
+      await supabase.rpc("increment_view_count", { thread_id: threadId })
+    } catch (error) {
+      console.error("Error incrementing view count:", error)
     }
   }
 
@@ -175,7 +185,7 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
           <CardHeader className="space-y-4">
             <div className="h-8 bg-gray-200 rounded w-3/4"></div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+              <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
               <div className="space-y-2">
                 <div className="h-4 bg-gray-200 rounded w-24"></div>
                 <div className="h-3 bg-gray-200 rounded w-16"></div>
@@ -198,7 +208,13 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
       <Card>
         <CardContent className="p-12 text-center">
           <h3 className="text-xl font-semibold text-gray-600 mb-2">主题不存在</h3>
-          <p className="text-gray-500">请检查链接是否正确</p>
+          <p className="text-gray-500 mb-4">请检查链接是否正确</p>
+          <Link href={`/forums/${forumSlug}`}>
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              返回版块
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     )
@@ -206,10 +222,23 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center space-x-2 text-sm text-gray-500">
+        <Link href="/forums" className="hover:text-blue-600 transition-colors">
+          版块
+        </Link>
+        <span>/</span>
+        <Link href={`/forums/${forumSlug}`} className="hover:text-blue-600 transition-colors">
+          {thread.forum?.name}
+        </Link>
+        <span>/</span>
+        <span className="text-gray-900 truncate">{thread.title}</span>
+      </nav>
+
       {/* Thread Header */}
       <Card className="border-0 shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-2 mb-3">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2 mb-4">
             {thread.is_pinned && (
               <Badge variant="destructive">
                 <Pin className="mr-1 h-3 w-3" />
@@ -217,34 +246,36 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
               </Badge>
             )}
             {thread.is_locked && (
-              <Badge variant="outline">
+              <Badge variant="outline" className="border-orange-300 text-orange-700">
                 <Lock className="mr-1 h-3 w-3" />
                 已锁定
               </Badge>
             )}
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">{thread.title}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">{thread.title}</h1>
 
           <div className="flex items-start gap-4">
             <div className="flex flex-col items-center">
-              <Avatar className="h-12 w-12 mb-2">
+              <Avatar className="h-14 w-14 mb-2">
                 <AvatarImage src={thread.profiles?.avatar_url || "/placeholder.svg"} />
-                <AvatarFallback>{thread.profiles?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                <AvatarFallback className="text-lg">
+                  {thread.profiles?.username?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
               </Avatar>
               <div className="text-center">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-sm font-medium text-gray-900">{thread.profiles?.username || "未知用户"}</span>
+                <div className="flex flex-col items-center gap-1 mb-1">
+                  <span className="text-sm font-semibold text-gray-900">{thread.profiles?.username || "未知用户"}</span>
                   {thread.profiles?.is_verified && thread.profiles?.verification_type && (
-                    <VerificationBadge type={thread.profiles.verification_type} size="sm" showText={false} />
+                    <VerificationBadge verificationType={thread.profiles.verification_type} size="sm" showText={true} />
                   )}
                 </div>
-                <p className="text-xs text-gray-500">楼主</p>
+                <p className="text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded">楼主</p>
               </div>
             </div>
 
             <div className="flex-1">
-              <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+              <div className="flex items-center gap-6 text-sm text-gray-500 mb-4">
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   <span>{formatDistanceToNow(new Date(thread.created_at), { addSuffix: true, locale: zhCN })}</span>
@@ -253,6 +284,10 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
                   <MessageCircle className="h-4 w-4" />
                   <span>{posts.length} 回复</span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <Eye className="h-4 w-4" />
+                  <span>{thread.view_count || 0} 浏览</span>
+                </div>
               </div>
             </div>
           </div>
@@ -260,7 +295,7 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
 
         <CardContent>
           <div
-            className="prose prose-sm max-w-none text-gray-700"
+            className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
             dangerouslySetInnerHTML={{ __html: thread.content }}
           />
         </CardContent>
@@ -270,36 +305,36 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
       <div className="space-y-4">
         {posts.map((post, index) => (
           <Card key={post.id} className="border-0 shadow-sm">
-            <CardContent className="p-4">
+            <CardContent className="p-5">
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
-                  <Avatar className="h-10 w-10 mb-1">
+                  <Avatar className="h-11 w-11 mb-2">
                     <AvatarImage src={post.author?.avatar_url || "/placeholder.svg"} />
                     <AvatarFallback>{post.author?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
                   <div className="text-center">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs font-medium text-gray-700">{post.author?.username || "未知用户"}</span>
+                    <div className="flex flex-col items-center gap-1 mb-1">
+                      <span className="text-sm font-medium text-gray-700">{post.author?.username || "未知用户"}</span>
                       {post.author?.is_verified && post.author?.verification_type && (
-                        <VerificationBadge type={post.author.verification_type} size="sm" showText={false} />
+                        <VerificationBadge verificationType={post.author.verification_type} size="sm" showText={true} />
                       )}
                     </div>
-                    <p className="text-xs text-gray-500">#{index + 1}楼</p>
+                    <p className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">#{index + 1}楼</p>
                   </div>
                 </div>
 
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Clock className="h-3 w-3" />
                       <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: zhCN })}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-blue-600">
                         <Reply className="h-3 w-3 mr-1" />
                         回复
                       </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-red-600">
                         <Flag className="h-3 w-3 mr-1" />
                         举报
                       </Button>
@@ -307,7 +342,7 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
                   </div>
 
                   <div
-                    className="prose prose-sm max-w-none text-gray-700"
+                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: post.content }}
                   />
                 </div>
@@ -326,17 +361,23 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
           <CardContent className="space-y-4">
             {currentUser ? (
               <>
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-8 w-8">
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-10 w-10">
                     <AvatarImage src={currentUser.avatar_url || "/placeholder.svg"} />
                     <AvatarFallback>{currentUser.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-gray-700">{currentUser.username}</span>
+                      {currentUser.is_verified && currentUser.verification_type && (
+                        <VerificationBadge verificationType={currentUser.verification_type} size="sm" showText={true} />
+                      )}
+                    </div>
                     <Textarea
                       placeholder="输入您的回复..."
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
-                      className="min-h-[120px] resize-none"
+                      className="min-h-[120px] resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -344,7 +385,7 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
                   <Button
                     onClick={handleSubmitReply}
                     disabled={isSubmitting || !replyContent.trim()}
-                    className="min-w-[100px]"
+                    className="min-w-[120px] bg-blue-600 hover:bg-blue-700"
                   >
                     {isSubmitting ? (
                       <>

@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Shield, Star, Crown, Award, CheckCircle } from "lucide-react"
 
 interface VerificationBadgeProps {
-  type: string
+  verificationType: string
   size?: "sm" | "md" | "lg"
   showText?: boolean
   className?: string
@@ -50,12 +50,12 @@ const verificationTypes = {
 }
 
 export default function VerificationBadge({
-  type,
+  verificationType,
   size = "md",
   showText = true,
   className = "",
 }: VerificationBadgeProps) {
-  const verification = verificationTypes[type as keyof typeof verificationTypes]
+  const verification = verificationTypes[verificationType as keyof typeof verificationTypes]
 
   if (!verification) {
     return null
@@ -84,11 +84,12 @@ export default function VerificationBadge({
         font-medium
         inline-flex items-center
         hover:shadow-sm transition-shadow
+        border
         ${className}
       `}
     >
       <Icon className={`${iconSizes[size]} ${verification.iconColor}`} />
-      {showText && <span>{verification.name}</span>}
+      {showText && <span className="ml-1">{verification.name}</span>}
     </Badge>
   )
 

@@ -8,10 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Pin, Lock, MessageSquare, Clock, Search, Filter, MessageCircle } from "lucide-react"
+import { Plus, Pin, Lock, MessageSquare, Clock, Search, Filter, MessageCircle, Eye } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { formatDistanceToNow } from "date-fns"
-import { zhCN } from "date-fns/locale"
 import VerificationBadge from "@/components/ui/verification-badge"
 
 interface Thread {
@@ -22,6 +20,7 @@ interface Thread {
   is_locked: boolean
   created_at: string
   created_by: string
+  view_count: number
   profiles: {
     username: string
     avatar_url: string
@@ -37,7 +36,7 @@ interface EnhancedThreadListProps {
   forumName: string
 }
 
-type SortBy = "latest" | "popular" | "oldest"
+type SortBy = "latest" | "popular" | "oldest" | "most_replies"
 
 export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThreadListProps) {
   const [threads, setThreads] = useState<Thread[]>([])
@@ -92,7 +91,22 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
       if (error) {
         console.error("Error fetching threads:", error)
       } else {
-        setThreads(threads || [])
+        // Get reply counts for each thread
+        const threadsWithCounts = await Promise.all(
+          (threads || []).map(async (thread) => {
+            const { count: replyCount } = await supabase
+              .from("posts")
+              .select("*", { count: "exact", head: true })
+              .eq("thread_id", thread.id)
+
+            return {
+              ...thread,
+              posts: [{ count: replyCount || 0 }],
+            }
+          }),
+        )
+
+        setThreads(threadsWithCounts)
       }
     } catch (error) {
       console.error("Unexpected error fetching threads:", error)
@@ -115,8 +129,14 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
     })
 
     filtered.sort((a, b) => {
+      // Always keep pinned threads at the top
+      if (a.is_pinned && !b.is_pinned) return -1
+      if (!a.is_pinned && b.is_pinned) return 1
+
       switch (sortBy) {
         case "popular":
+          return (b.view_count || 0) - (a.view_count || 0)
+        case "most_replies":
           return (b.posts?.[0]?.count || 0) - (a.posts?.[0]?.count || 0)
         case "oldest":
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -127,6 +147,22 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
     })
 
     setFilteredThreads(filtered)
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+      return `${diffInMinutes}分钟`
+    } else if (diffInHours < 24) {
+      return `${diffInHours}小时`
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24)
+      return `${diffInDays}天`
+    }
   }
 
   if (loading) {
@@ -162,9 +198,9 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
               <span>/</span>
               <span className="text-gray-900">{forumName}</span>
             </nav>
-            <h1 className="text-2xl font-bold text-gray-900">{forumName}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{forumName}</h1>
           </div>
-          <Button asChild className="shadow-lg">
+          <Button asChild className="shadow-lg bg-blue-600 hover:bg-blue-700">
             <Link href={`/forums/${forumSlug}/create-thread`}>
               <Plus className="mr-2 h-4 w-4" />
               发布主题
@@ -180,11 +216,11 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
               placeholder="搜索主题..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-40 border-gray-300">
               <Filter className="mr-2 h-4 w-4" />
               <SelectValue />
             </SelectTrigger>
@@ -195,13 +231,14 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
-            <SelectTrigger className="w-full sm:w-32">
+            <SelectTrigger className="w-full sm:w-36 border-gray-300">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="latest">最新</SelectItem>
-              <SelectItem value="popular">热门</SelectItem>
-              <SelectItem value="oldest">最早</SelectItem>
+              <SelectItem value="latest">最新发布</SelectItem>
+              <SelectItem value="popular">最多浏览</SelectItem>
+              <SelectItem value="most_replies">最多回复</SelectItem>
+              <SelectItem value="oldest">最早发布</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -225,20 +262,20 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredThreads.map((thread) => (
             <Card key={thread.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3">
                   {/* Author Avatar */}
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center flex-shrink-0">
                     <Avatar className="h-10 w-10 mb-1">
                       <AvatarImage src={thread.profiles?.avatar_url || "/placeholder.svg"} />
                       <AvatarFallback>{thread.profiles?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col items-center text-center">
-                      <span className="text-xs text-gray-500 font-medium">
-                        {thread.profiles?.username || "未知用户"}
+                      <span className="text-xs text-gray-600 font-medium max-w-[60px] truncate">
+                        {thread.profiles?.username || "未知"}
                       </span>
                       {thread.profiles?.is_verified && thread.profiles?.verification_type && (
                         <VerificationBadge
@@ -254,42 +291,56 @@ export default function EnhancedThreadList({ forumSlug, forumName }: EnhancedThr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       {thread.is_pinned && (
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
                           <Pin className="mr-1 h-3 w-3" />
                           置顶
                         </Badge>
                       )}
                       {thread.is_locked && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-orange-300 text-orange-700">
                           <Lock className="mr-1 h-3 w-3" />
-                          已锁定
+                          锁定
                         </Badge>
                       )}
                     </div>
 
                     <Link href={`/forums/${forumSlug}/threads/${thread.id}`}>
-                      <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 mb-2">
+                      <h3 className="text-base font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 mb-2">
                         {thread.title}
                       </h3>
                     </Link>
 
                     <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                      {thread.content.replace(/<[^>]*>/g, "").substring(0, 150)}...
+                      {thread.content.replace(/<[^>]*>/g, "").substring(0, 120)}
+                      {thread.content.length > 120 && "..."}
                     </p>
 
+                    {/* Simplified Stats */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
                         <div className="flex items-center gap-1">
-                          <MessageCircle className="h-4 w-4" />
-                          <span>{thread.posts?.[0]?.count || 0} 回复</span>
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          <span className="font-medium">{thread.posts?.[0]?.count || 0}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {formatDistanceToNow(new Date(thread.created_at), { addSuffix: true, locale: zhCN })}
-                          </span>
+                          <Eye className="h-3.5 w-3.5" />
+                          <span className="font-medium">{thread.view_count || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span className="font-medium">{formatTimeAgo(thread.created_at)}</span>
                         </div>
                       </div>
+
+                      <Link href={`/forums/${forumSlug}/threads/${thread.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs px-2 py-1 h-7 text-blue-600 hover:bg-blue-50"
+                        >
+                          查看
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </div>
