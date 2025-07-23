@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MessageSquare, Clock, Search, Plus, Eye, MessageCircle } from "lucide-react"
+import { MessageSquare, Search, Plus, Eye, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/hooks/use-toast"
@@ -120,13 +120,12 @@ export default function EnhancedForumList() {
       <div className="space-y-4">
         {[...Array(6)].map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-lg"></div>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
                 <div className="flex-1 space-y-2">
-                  <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+                  <div className="h-5 bg-gray-200 rounded w-1/3"></div>
                   <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                 </div>
               </div>
             </CardContent>
@@ -188,7 +187,7 @@ export default function EnhancedForumList() {
         </Link>
       </div>
 
-      {/* Forums Grid */}
+      {/* Forums List */}
       {filteredAndSortedForums.length === 0 ? (
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-12 text-center">
@@ -206,79 +205,66 @@ export default function EnhancedForumList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
           {filteredAndSortedForums.map((forum) => (
             <Card key={forum.id} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  {/* Forum Cover */}
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {forum.cover_image ? (
-                      <img
-                        src={forum.cover_image || "/placeholder.svg"}
-                        alt={forum.name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <MessageSquare className="h-8 w-8 text-white" />
-                    )}
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  {/* Forum Icon */}
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="h-6 w-6 text-white" />
                   </div>
 
                   {/* Forum Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 mb-1">
                       <Link href={`/forums/${forum.slug}`}>
-                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1">
+                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">
                           {forum.name}
                         </h3>
                       </Link>
                       {forum.category && (
-                        <Badge variant="secondary" className="ml-2 bg-gray-100 text-gray-700">
+                        <Badge variant="secondary" className="bg-gray-100 text-gray-700 text-xs">
                           {forum.category}
                         </Badge>
                       )}
                     </div>
 
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{forum.description}</p>
+                    <p className="text-gray-600 text-sm mb-2 line-clamp-1">{forum.description}</p>
 
-                    {/* Forum Stats */}
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                      <div className="flex items-center gap-1">
-                        <MessageCircle className="h-4 w-4" />
-                        <span>{forum._count?.threads || 0} 主题</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{new Date(forum.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Creator Info with Verification Badge */}
+                    {/* Creator and Stats */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
+                        <Avatar className="h-5 w-5">
                           <AvatarImage src={forum.creator?.avatar_url || "/placeholder.svg"} />
                           <AvatarFallback className="text-xs">
                             {forum.creator?.username?.charAt(0).toUpperCase() || "U"}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm text-gray-600">{forum.creator?.username || "未知用户"}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500">{forum.creator?.username || "未知用户"}</span>
                           {forum.creator?.is_verified && forum.creator?.verification_type && (
                             <VerificationBadge
                               verificationType={forum.creator.verification_type}
                               size="sm"
-                              showText={true}
+                              showText={false}
                             />
                           )}
                         </div>
                       </div>
-                      <Link href={`/forums/${forum.slug}`}>
-                        <Button variant="outline" size="sm" className="border-gray-300 bg-transparent">
-                          <Eye className="mr-1 h-3 w-3" />
-                          查看
-                        </Button>
-                      </Link>
+
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <MessageCircle className="h-4 w-4" />
+                          <span>{forum._count?.threads || 0}</span>
+                        </div>
+                        <Link href={`/forums/${forum.slug}`}>
+                          <Button variant="outline" size="sm" className="border-gray-300 bg-transparent">
+                            <Eye className="mr-1 h-3 w-3" />
+                            查看
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>

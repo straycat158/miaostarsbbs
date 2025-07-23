@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Shield, Sparkles, Globe, Zap, Award, ArrowRight, TrendingUp } from "lucide-react"
+import { Users, Shield, Sparkles, Globe, Zap, Award, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
 import NotificationBanner from "@/components/home/notification-banner"
 import EnhancedMobileCarousel from "@/components/home/enhanced-mobile-carousel"
 import MobileOptimizedForums from "@/components/home/mobile-optimized-forums"
 import RecentActivity from "@/components/home/recent-activity"
+import PopularThreads from "@/components/home/popular-threads"
+import CommunityStats from "@/components/home/community-stats"
 
 export default function HomePage() {
   // Enhanced carousel slides with mobile-optimized content
@@ -62,6 +64,11 @@ export default function HomePage() {
       <div className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-8">
         {/* Forums Section - Full width on mobile, 2/3 on desktop */}
         <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+          {/* Popular Threads Section */}
+          <section>
+            <PopularThreads />
+          </section>
+
           {/* Mobile-Optimized Forums */}
           <section>
             <MobileOptimizedForums />
@@ -182,35 +189,8 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Stats Card - Mobile optimized */}
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                社区数据
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-xl sm:text-2xl font-bold text-primary">1,234</div>
-                  <div className="text-xs sm:text-sm text-gray-600">注册用户</div>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-xl sm:text-2xl font-bold text-primary">5,678</div>
-                  <div className="text-xs sm:text-sm text-gray-600">主题数量</div>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-xl sm:text-2xl font-bold text-primary">9,012</div>
-                  <div className="text-xs sm:text-sm text-gray-600">回复数量</div>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-xl sm:text-2xl font-bold text-primary">345</div>
-                  <div className="text-xs sm:text-sm text-gray-600">今日活跃</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Real Community Stats */}
+          <CommunityStats />
         </div>
       </div>
 

@@ -3,10 +3,9 @@
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Shield, Star, Crown, Award, CheckCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 interface VerificationBadgeProps {
-  verificationType: string
+  type: string
   size?: "sm" | "md" | "lg"
   showText?: boolean
   className?: string
@@ -14,53 +13,60 @@ interface VerificationBadgeProps {
 
 const verificationTypes = {
   official: {
+    name: "官方认证",
+    description: "官方团队成员或合作伙伴",
     icon: Shield,
-    label: "官方认证",
-    description: "官方认证用户",
     color: "bg-blue-100 text-blue-800 border-blue-200",
+    iconColor: "text-blue-600",
   },
   expert: {
+    name: "专家认证",
+    description: "在特定领域具有专业知识的用户",
     icon: Star,
-    label: "专家认证",
-    description: "领域专家用户",
     color: "bg-purple-100 text-purple-800 border-purple-200",
+    iconColor: "text-purple-600",
   },
   vip: {
+    name: "VIP用户",
+    description: "高级会员或赞助者",
     icon: Crown,
-    label: "VIP用户",
-    description: "VIP会员用户",
     color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    iconColor: "text-yellow-600",
   },
   contributor: {
+    name: "贡献者",
+    description: "对社区做出重要贡献的用户",
     icon: Award,
-    label: "贡献者",
-    description: "社区贡献者",
     color: "bg-green-100 text-green-800 border-green-200",
+    iconColor: "text-green-600",
   },
   verified: {
+    name: "已认证",
+    description: "身份已验证的用户",
     icon: CheckCircle,
-    label: "已认证",
-    description: "身份已验证用户",
     color: "bg-gray-100 text-gray-800 border-gray-200",
+    iconColor: "text-gray-600",
   },
 }
 
 export default function VerificationBadge({
-  verificationType,
-  size = "sm",
+  type,
+  size = "md",
   showText = true,
-  className,
+  className = "",
 }: VerificationBadgeProps) {
-  const verification = verificationTypes[verificationType as keyof typeof verificationTypes]
+  const verification = verificationTypes[type as keyof typeof verificationTypes]
 
-  if (!verification) return null
+  if (!verification) {
+    return null
+  }
 
   const Icon = verification.icon
 
   const sizeClasses = {
-    sm: "text-xs px-1.5 py-0.5",
-    md: "text-sm px-2 py-1",
-    lg: "text-base px-3 py-1.5",
+    sm: "text-xs px-1.5 py-0.5 gap-1",
+    md: "text-sm px-2 py-1 gap-1.5",
+    lg: "text-base px-3 py-1.5 gap-2",
   }
 
   const iconSizes = {
@@ -69,25 +75,32 @@ export default function VerificationBadge({
     lg: "h-5 w-5",
   }
 
+  const badge = (
+    <Badge
+      variant="outline"
+      className={`
+        ${verification.color}
+        ${sizeClasses[size]}
+        font-medium
+        inline-flex items-center
+        hover:shadow-sm transition-shadow
+        ${className}
+      `}
+    >
+      <Icon className={`${iconSizes[size]} ${verification.iconColor}`} />
+      {showText && <span>{verification.name}</span>}
+    </Badge>
+  )
+
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge
-            variant="secondary"
-            className={cn(
-              verification.color,
-              sizeClasses[size],
-              "font-medium inline-flex items-center gap-1 border",
-              className,
-            )}
-          >
-            <Icon className={iconSizes[size]} />
-            {showText && <span>{verification.label}</span>}
-          </Badge>
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
         <TooltipContent>
-          <p>{verification.description}</p>
+          <div className="text-center">
+            <div className="font-semibold">{verification.name}</div>
+            <div className="text-sm text-gray-600">{verification.description}</div>
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
