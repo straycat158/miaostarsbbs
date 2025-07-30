@@ -2,28 +2,53 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Bell, User, Settings, LogOut, Menu, Heart, Globe, MessageSquare, Info, Package, Shield } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { signOut } from "@/lib/auth"
-import { useRouter } from "next/navigation"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { motion } from "framer-motion"
+import { Bell, Menu, User, Settings, LogOut, Shield, Home, MessageSquare, Package, Info } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "@/hooks/use-toast"
 import VerificationBadge from "@/components/ui/verification-badge"
+import NotificationCenter from "@/components/notifications/notification-center"
+import { useNotifications } from "@/hooks/use-notifications"
 
 export default function EnhancedHeader() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const { unreadCount } = useNotifications()
 
   useEffect(() => {
-    const getUser = async () => {
+    checkUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") {
+        checkUser()
+      } else if (event === "SIGNED_OUT") {
+        setUser(null)
+        setProfile(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const checkUser = async () => {
+    try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -32,209 +57,277 @@ export default function EnhancedHeader() {
       if (user) {
         const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
         setProfile(profile)
-
-        const { data: notifications } = await supabase
-          .from("notifications")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("read", false)
-          .order("created_at", { ascending: false })
-        setNotifications(notifications || [])
       }
+    } catch (error) {
+      console.error("Error checking user:", error)
+    } finally {
+      setLoading(false)
     }
-
-    getUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN") {
-        setUser(session?.user || null)
-      } else if (event === "SIGNED_OUT") {
-        setUser(null)
-        setProfile(null)
-        setNotifications([])
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const handleSignOut = async () => {
-    await signOut()
-    router.push("/")
   }
 
-  const navItems = [
-    { href: "/", label: "首页", icon: Globe },
-    { href: "/forums", label: "版块", icon: MessageSquare },
-    { href: "/resources", label: "资源中心", icon: Package },
-    { href: "/verification", label: "身份认证", icon: Shield },
-    { href: "/about", label: "关于我们", icon: Info },
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
+      toast({
+        title: "已退出登录",
+        description: "您已成功退出登录",
+      })
+
+      router.push("/")
+    } catch (error) {
+      console.error("Error signing out:", error)
+      toast({
+        title: "退出失败",
+        description: "退出登录时发生错误",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleNavigation = (path: string) => {
+    router.push(path)
+    setIsMobileMenuOpen(false)
+  }
+
+  const isActivePath = (path: string) => {
+    return pathname === path || pathname.startsWith(path + "/")
+  }
+
+  const navigationItems = [
+    { name: "首页", path: "/", icon: Home },
+    { name: "版块", path: "/forums", icon: MessageSquare },
+    { name: "资源", path: "/resources", icon: Package },
+    { name: "关于", path: "/about", icon: Info },
   ]
 
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
-    <div className={mobile ? "flex flex-col space-y-2" : "flex items-center space-x-1"}>
-      {navItems.map((item) => {
-        const Icon = item.icon
-        const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
-
-        return (
-          <div key={item.href} className="relative">
-            <Button
-              variant={isActive ? "default" : "ghost"}
-              size="sm"
-              asChild
-              className={`
-                relative transition-all duration-200 
-                ${mobile ? "w-full justify-start" : ""}
-                ${isActive ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-accent"}
-              `}
-            >
-              <Link href={item.href}>
-                <Icon className={`h-4 w-4 ${mobile ? "mr-2" : "mr-1"}`} />
-                {item.label}
-              </Link>
-            </Button>
-          </div>
-        )
-      })}
-    </div>
-  )
-
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center space-x-3">
-            {/* Enhanced Logo */}
-            <motion.div
-              className="relative"
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            >
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
-                <div className="relative">
-                  <MessageSquare className="h-5 w-5 text-white" />
-                  <div className="absolute -top-1 -right-1 h-2 w-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                </div>
+    <>
+      <header className="sticky top-0 z-40 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-2">
+              <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">F</span>
               </div>
-              <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></div>
-            </motion.div>
-            <div className="flex flex-col">
-              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                论坛社区
-              </span>
-              <span className="text-xs text-gray-500 -mt-1">Forum Community</span>
-            </div>
-          </Link>
+              <span className="font-bold text-xl text-gray-900">论坛</span>
+            </Link>
 
-          <nav className="hidden md:flex">
-            <NavLinks />
-          </nav>
-        </div>
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-1">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActivePath(item.path)
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </nav>
 
-        <div className="flex items-center gap-3">
-          {user ? (
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-4 w-4" />
-                    {notifications.length > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                        {notifications.length}
-                      </Badge>
+            {/* Right Side */}
+            <div className="flex items-center space-x-3">
+              {/* Notifications */}
+              {user && (
+                <div className="relative">
+                  <Button variant="ghost" size="icon" onClick={() => setIsNotificationOpen(true)} className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
                     )}
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  {notifications.length > 0 ? (
-                    notifications.map((notification) => (
-                      <DropdownMenuItem key={notification.id} className="flex flex-col items-start p-4">
-                        <div className="font-medium">{notification.title}</div>
-                        <div className="text-sm text-muted-foreground">{notification.message}</div>
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <DropdownMenuItem>暂无新通知</DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </div>
+              )}
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <div className="relative">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={profile?.username} />
-                        <AvatarFallback>{profile?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+              {/* User Menu */}
+              {loading ? (
+                <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse" />
+              ) : user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
+                        <AvatarFallback>
+                          {profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
-                      {profile?.is_verified && profile?.verification_type && (
-                        <div className="absolute -bottom-1 -right-1">
-                          <VerificationBadge verificationType={profile.verification_type} size="sm" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end">
+                    <div className="flex items-center justify-start gap-2 p-2">
+                      <div className="flex flex-col space-y-1 leading-none">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{profile?.username || "用户"}</p>
+                          {profile?.is_verified && profile?.verification_type && (
+                            <VerificationBadge
+                              verificationType={profile.verification_type}
+                              size="sm"
+                              showText={false}
+                            />
+                          )}
                         </div>
-                      )}
+                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                      </div>
                     </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/profile/${profile?.username}`}>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push(`/profile/${profile?.username}`)}>
                       <User className="mr-2 h-4 w-4" />
                       个人资料
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/settings")}>
                       <Settings className="mr-2 h-4 w-4" />
                       设置
-                    </Link>
-                  </DropdownMenuItem>
-                  {!profile?.is_verified && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/verification">
-                        <Shield className="mr-2 h-4 w-4" />
-                        申请认证
-                      </Link>
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    退出登录
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" asChild>
-                <Link href="/auth">登录</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/auth">
-                  <Heart className="mr-2 h-4 w-4" />
-                  注册
-                </Link>
-              </Button>
-            </div>
-          )}
+                    {!profile?.is_verified && (
+                      <DropdownMenuItem onClick={() => router.push("/verification")}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span className="text-blue-600 font-medium">申请认证</span>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      退出登录
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="hidden md:flex items-center space-x-2">
+                  <Button variant="ghost" onClick={() => router.push("/auth")}>
+                    登录
+                  </Button>
+                  <Button onClick={() => router.push("/auth")}>注册</Button>
+                </div>
+              )}
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80">
-              <div className="flex flex-col gap-6 mt-8">
-                <div className="text-lg font-semibold text-gray-900">导航菜单</div>
-                <NavLinks mobile />
-              </div>
-            </SheetContent>
-          </Sheet>
+              {/* Mobile Menu */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80">
+                  <div className="flex flex-col h-full">
+                    {/* User Info */}
+                    {user && profile ? (
+                      <div className="flex items-center gap-3 p-4 border-b">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
+                          <AvatarFallback>{profile.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{profile.username}</p>
+                            {profile.is_verified && profile.verification_type && (
+                              <VerificationBadge
+                                verificationType={profile.verification_type}
+                                size="sm"
+                                showText={false}
+                              />
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 border-b">
+                        <div className="space-y-2">
+                          <Button className="w-full" onClick={() => handleNavigation("/auth")}>
+                            登录
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full bg-transparent"
+                            onClick={() => handleNavigation("/auth")}
+                          >
+                            注册
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Navigation */}
+                    <nav className="flex-1 py-4">
+                      <div className="space-y-1">
+                        {navigationItems.map((item) => (
+                          <button
+                            key={item.path}
+                            onClick={() => handleNavigation(item.path)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg transition-colors ${
+                              isActivePath(item.path) ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            {item.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {user && (
+                        <>
+                          <div className="border-t my-4" />
+                          <div className="space-y-1">
+                            <button
+                              onClick={() => handleNavigation(`/profile/${profile?.username}`)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                            >
+                              <User className="h-5 w-5" />
+                              个人资料
+                            </button>
+                            <button
+                              onClick={() => handleNavigation("/settings")}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                            >
+                              <Settings className="h-5 w-5" />
+                              设置
+                            </button>
+                            {!profile?.is_verified && (
+                              <button
+                                onClick={() => handleNavigation("/verification")}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <Shield className="h-5 w-5" />
+                                <span className="font-medium">申请认证</span>
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </nav>
+
+                    {/* Sign Out */}
+                    {user && (
+                      <div className="border-t p-4">
+                        <button
+                          onClick={handleSignOut}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="h-5 w-5" />
+                          退出登录
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Notification Center */}
+      <NotificationCenter isOpen={isNotificationOpen} onClose={() => setIsNotificationOpen(false)} />
+    </>
   )
 }

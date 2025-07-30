@@ -13,6 +13,8 @@ import { zhCN } from "date-fns/locale"
 import VerificationBadge from "@/components/ui/verification-badge"
 import { toast } from "@/hooks/use-toast"
 import Link from "next/link"
+import ImageGallery from "./image-gallery"
+import { processContent } from "@/lib/content-processor"
 
 interface Thread {
   id: string
@@ -151,13 +153,37 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
     try {
       setIsSubmitting(true)
 
-      const { error } = await supabase.from("posts").insert({
-        content: replyContent.trim(),
-        thread_id: threadId,
-        created_by: currentUser.id,
-      })
+      const { data: newPost, error } = await supabase
+        .from("posts")
+        .insert({
+          content: replyContent.trim(),
+          thread_id: threadId,
+          created_by: currentUser.id,
+        })
+        .select()
+        .single()
 
       if (error) throw error
+
+      // 检测@提及
+      const mentionRegex = /@(\w+)/g
+      const mentions = replyContent.match(mentionRegex)
+
+      if (mentions && newPost) {
+        for (const mention of mentions) {
+          const username = mention.substring(1) // 移除@符号
+          try {
+            await supabase.rpc("create_mention_notification", {
+              mentioned_username: username,
+              post_id: newPost.id,
+              thread_id: threadId,
+              sender_id: currentUser.id,
+            })
+          } catch (mentionError) {
+            console.error("Error creating mention notification:", mentionError)
+          }
+        }
+      }
 
       toast({
         title: "回复成功",
@@ -219,6 +245,9 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
       </Card>
     )
   }
+
+  // 处理主题内容
+  const threadProcessedContent = processContent(thread.content)
 
   return (
     <div className="space-y-6">
@@ -293,63 +322,86 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="space-y-6">
+          {/* 主题内容 */}
           <div
             className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: thread.content }}
+            dangerouslySetInnerHTML={{ __html: threadProcessedContent.html }}
           />
+
+          {/* 主题图片 */}
+          {threadProcessedContent.images.length > 0 && (
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">图片附件</h3>
+              <ImageGallery images={threadProcessedContent.images} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Posts */}
       <div className="space-y-4">
-        {posts.map((post, index) => (
-          <Card key={post.id} className="border-0 shadow-sm">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex flex-col items-center">
-                  <Avatar className="h-11 w-11 mb-2">
-                    <AvatarImage src={post.author?.avatar_url || "/placeholder.svg"} />
-                    <AvatarFallback>{post.author?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                  </Avatar>
-                  <div className="text-center">
-                    <div className="flex flex-col items-center gap-1 mb-1">
-                      <span className="text-sm font-medium text-gray-700">{post.author?.username || "未知用户"}</span>
-                      {post.author?.is_verified && post.author?.verification_type && (
-                        <VerificationBadge verificationType={post.author.verification_type} size="sm" showText={true} />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">#{index + 1}楼</p>
-                  </div>
-                </div>
+        {posts.map((post, index) => {
+          const postProcessedContent = processContent(post.content)
 
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: zhCN })}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-blue-600">
-                        <Reply className="h-3 w-3 mr-1" />
-                        回复
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-red-600">
-                        <Flag className="h-3 w-3 mr-1" />
-                        举报
-                      </Button>
+          return (
+            <Card key={post.id} className="border-0 shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex flex-col items-center">
+                    <Avatar className="h-11 w-11 mb-2">
+                      <AvatarImage src={post.author?.avatar_url || "/placeholder.svg"} />
+                      <AvatarFallback>{post.author?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    </Avatar>
+                    <div className="text-center">
+                      <div className="flex flex-col items-center gap-1 mb-1">
+                        <span className="text-sm font-medium text-gray-700">{post.author?.username || "未知用户"}</span>
+                        {post.author?.is_verified && post.author?.verification_type && (
+                          <VerificationBadge
+                            verificationType={post.author.verification_type}
+                            size="sm"
+                            showText={true}
+                          />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">#{index + 1}楼</p>
                     </div>
                   </div>
 
-                  <div
-                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: post.content }}
-                  />
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: zhCN })}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-blue-600">
+                          <Reply className="h-3 w-3 mr-1" />
+                          回复
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-red-600">
+                          <Flag className="h-3 w-3 mr-1" />
+                          举报
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 回复内容 */}
+                    <div
+                      className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: postProcessedContent.html }}
+                    />
+
+                    {/* 回复图片 */}
+                    {postProcessedContent.images.length > 0 && (
+                      <ImageGallery images={postProcessedContent.images} className="mt-4" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Reply Section */}
@@ -374,11 +426,14 @@ export default function EnhancedThreadDetail({ threadId, forumSlug }: EnhancedTh
                       )}
                     </div>
                     <Textarea
-                      placeholder="输入您的回复..."
+                      placeholder="输入您的回复... 使用 @用户名 来提及其他用户，支持 Markdown 格式和图片链接"
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
                       className="min-h-[120px] resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
+                    <div className="mt-2 text-xs text-gray-500">
+                      支持 Markdown 格式：**粗体**、*斜体*、![图片](链接)、[链接](地址)、`代码`
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end">
